@@ -1,0 +1,153 @@
+export const currentUser = {
+  id: 'u1',
+  name: 'Aneesh Kumar',
+  neighborhood: 'Kakadeo, Kanpur',
+  rating: 4.7,
+  reviewCount: 23,
+  memberSince: '2025',
+  avatar: 'https://i.pravatar.cc/150?img=12',
+};
+
+export const categories = [
+  'All',
+  'Furniture',
+  'Electronics',
+  'Books',
+  'Vehicles',
+  'Home & Kitchen',
+  'Services',
+];
+
+export const listings = [
+  {
+    id: 'l1',
+    title: 'Study table with chair',
+    price: 1800,
+    category: 'Furniture',
+    distance: '0.4 km away',
+    seller: 'Ritika S.',
+    sellerRating: 4.8,
+    image: 'https://picsum.photos/seed/table1/480/360',
+    condition: 'Like new',
+    postedAgo: '2h ago',
+  },
+  {
+    id: 'l2',
+    title: 'iPhone 12, 128GB',
+    price: 21000,
+    category: 'Electronics',
+    distance: '1.1 km away',
+    seller: 'Dev M.',
+    sellerRating: 4.6,
+    image: 'https://picsum.photos/seed/phone1/480/360',
+    condition: 'Good',
+    postedAgo: '5h ago',
+  },
+  {
+    id: 'l3',
+    title: 'DSA + System Design book set',
+    price: 650,
+    category: 'Books',
+    distance: '0.8 km away',
+    seller: 'Priya T.',
+    sellerRating: 4.9,
+    image: 'https://picsum.photos/seed/books1/480/360',
+    condition: 'Good',
+    postedAgo: '1d ago',
+  },
+  {
+    id: 'l4',
+    title: 'Activa 5G, 2019 model',
+    price: 42000,
+    category: 'Vehicles',
+    distance: '2.3 km away',
+    seller: 'Sanjay K.',
+    sellerRating: 4.5,
+    image: 'https://picsum.photos/seed/activa1/480/360',
+    condition: 'Fair',
+    postedAgo: '3d ago',
+  },
+  {
+    id: 'l5',
+    title: 'Induction cooktop, barely used',
+    price: 900,
+    category: 'Home & Kitchen',
+    distance: '0.6 km away',
+    seller: 'Meera J.',
+    sellerRating: 4.7,
+    image: 'https://picsum.photos/seed/cooktop1/480/360',
+    condition: 'Like new',
+    postedAgo: '6h ago',
+  },
+  {
+    id: 'l6',
+    title: 'Home tutoring — Maths & Physics',
+    price: 300,
+    category: 'Services',
+    distance: '1.5 km away',
+    seller: 'Arjun P.',
+    sellerRating: 4.9,
+    image: 'https://picsum.photos/seed/tutor1/480/360',
+    condition: 'Service',
+    postedAgo: '4h ago',
+  },
+];
+
+export const conversations = [
+  {
+    id: 'c1',
+    listingId: 'l1',
+    listingTitle: 'Study table with chair',
+    withUser: 'Ritika S.',
+    avatar: 'https://i.pravatar.cc/150?img=32',
+    lastMessage: 'Sure, 6pm works. I\u2019ll keep it ready.',
+    unread: 2,
+    time: '10:42 AM',
+    messages: [
+      { from: 'them', text: 'Hi! Yes it\u2019s still available.', time: '10:12 AM' },
+      { from: 'me', text: 'Great, can I come see it today evening?', time: '10:15 AM' },
+      { from: 'them', text: 'Sure, 6pm works. I\u2019ll keep it ready.', time: '10:42 AM' },
+    ],
+  },
+  {
+    id: 'c2',
+    listingId: 'l2',
+    listingTitle: 'iPhone 12, 128GB',
+    withUser: 'Dev M.',
+    avatar: 'https://i.pravatar.cc/150?img=51',
+    lastMessage: 'Can you do 20k?',
+    unread: 0,
+    time: 'Yesterday',
+    messages: [
+      { from: 'me', text: 'Is the box and charger included?', time: 'Yesterday' },
+      { from: 'them', text: 'Yes, both included.', time: 'Yesterday' },
+      { from: 'me', text: 'Can you do 20k?', time: 'Yesterday' },
+    ],
+  },
+];
+
+export const orders = [
+  {
+    id: 'o1',
+    listingTitle: 'Induction cooktop, barely used',
+    price: 900,
+    status: 'escrow_held',
+    seller: 'Meera J.',
+    placedOn: '10 Sep 2026',
+  },
+  {
+    id: 'o2',
+    listingTitle: 'DSA + System Design book set',
+    price: 650,
+    status: 'delivered',
+    seller: 'Priya T.',
+    placedOn: '2 Sep 2026',
+  },
+];
+
+export const notifications = [
+  { id: 'n1', text: 'Ritika S. sent you a message about "Study table with chair"', time: '2h ago', read: false },
+  { id: 'n2', text: 'Your payment for "Induction cooktop" is held in escrow', time: '1d ago', read: false },
+  { id: 'n3', text: 'Priya T. marked your order as delivered', time: '3d ago', read: true },
+  { id: 'n4', text: 'New listing near you: "Gaming chair, 6 months old"', time: '4d ago', read: true },
+];
