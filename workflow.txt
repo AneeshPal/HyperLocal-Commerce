@@ -1,0 +1,85 @@
+1.Backend foundation + Auth:-
+Node.js + Express server, MongoDB connection, User model (name, phone/email, 
+password hash, location coordinates, neighborhood). JWT-based signup/login, 
+protected routes middleware. This unblocks everything else since every other feature 
+needs a logged-in user.
+
+a. Set up the backend project
+New folder alongside `Frontend` (e.g. `HyperLocal Commerce/Backend`), run `npm init -y`, 
+install core packages: `express mongoose dotenv cors bcryptjs jsonwebtoken`, plus `nodemon` as 
+a dev dependency for auto-restart.
+
+b. Server skeleton + DB connection
+Create `server.js` (or `index.js`) as the entry point: initialize Express app, connect to MongoDB via 
+Mongoose using a connection string from `.env`, set up CORS so your React frontend 
+(running on a different port) can call it, and a basic health-check route 
+(`GET /` returns 'API running').
+
+c. User model:
+Define the User schema in `models/User.js`: name, email/phone, password (hashed, never stored plain),
+location (GeoJSON point for later geospatial search), neighborhood, createdAt. 
+Use bcryptjs to hash passwords before saving.
+
+d. Signup & login endpoints:
+`routes/auth.js` with two endpoints: `POST /api/auth/signup` (create user, hash password, return JWT) 
+and `POST /api/auth/login` (verify email/password, return JWT). The JWT should encode the user's id 
+and expire in a reasonable window (e.g. 7 days).
+
+e. JWT verification middleware
+`middleware/auth.js` — a function that reads the `Authorization: Bearer <token>` header, 
+verifies the JWT, and attaches the decoded user id to `req.user`. 
+Any route that needs a logged-in user (creating a listing, chatting, checkout) will use this 
+middleware.
+
+6. Test with Postman/Thunder Client
+Use Postman, Thunder Client (VS Code extension), or curl to test signup and login directly
+against the backend — before touching the frontend at all. 
+Confirm you get a valid JWT back and that wrong passwords are rejected.
+
+7. Connect frontend Login/Signup to the API
+Replace the mock `navigate('/')` in `Login.jsx` and `Signup.jsx` with real `fetch`/`axios` calls 
+to your new endpoints. Store the returned JWT (e.g. in localStorage or a React context), and
+send it in the `Authorization` header on future requests.
+
+
+
+2.Listings API + image upload:-
+Listing model (title, price, category, condition, images, location as GeoJSON point,
+seller ref). CRUD APIs: create, edit, delete, get-by-id. 
+Image upload (Cloudinary or multer + local/S3) for the photo picker you already built 
+in Create Listing.
+
+
+3.Geospatial search & filters:-
+MongoDB `2dsphere` geospatial index on listing location. 
+API endpoint using `$near`/`$geoWithin` to return listings within a given 
+radius of the user's coordinates, plus category and price-range filters. 
+This is what powers your Home feed and search bar for real.
+
+
+4.Real-time chat (Socket.io):-
+Socket.io server, a Conversation + Message model (buyer, seller, 
+listingId, messages array or separate collection), join/leave rooms per conversation, 
+persist messages so chat history survives refresh. Wire your existing Chat.jsx to a real 
+socket connection instead of local state.
+
+
+5.Payments + escrow logic:-
+Order model (listing, buyer, seller, amount, status: paid/escrow_held/delivered/released).
+Integrate Razorpay Orders API for payment capture, then a manual/buyer-triggered "confirm delivery" 
+endpoint that releases funds. Wire this into your existing Checkout.jsx and Orders.jsx.
+
+
+6.Notifications:-
+Notification model + endpoint to fetch a user's notifications, triggered server-side on events
+(new message, payment held, order delivered). Simplest version: just DB-backed, polled on load — push notifications
+can come later.
+
+
+7.Ratings & reviews:-
+Review model tied to completed orders (rating + text, buyer→seller and optionally seller→buyer). 
+Update seller's average rating. Wire into your existing Profile.jsx reviews tab.
+
+8.Claude-powered pricing suggestion:-
+Call the Claude API server-side: given category, condition, and similar recent listings, suggest a 
+fair price range when a seller is creating a listing. 

@@ -1,25 +1,26 @@
 import { createTheme } from '@mui/material/styles';
 
-// Palette grounded in the product's subject: a neighborhood marketplace.
-// Deep market-awning teal as the anchor, marigold (street-stall flag colour)
-// as the single accent, warm stone neutrals instead of pure grey/white.
+// Palette: "Electric Sage" — a deep, confident forest-green anchor with a
+// punchy electric-lime accent. Reads premium (green = trust, good for
+// payments/escrow) while the lime keeps it energetic for a Gen-Z audience,
+// instead of the usual teal/orange marketplace combo.
 const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#2F5D50',
-      dark: '#1F4038',
-      light: '#4C7A6C',
-      contrastText: '#F7F5F0',
+      main: '#1F4B3F',
+      dark: '#153A30',
+      light: '#3D6B5C',
+      contrastText: '#FAF9F5',
     },
     secondary: {
-      main: '#E3A008',
-      dark: '#B67D06',
-      light: '#F0BE4C',
-      contrastText: '#1B2320',
+      main: '#C4F135',
+      dark: '#A3CC28',
+      light: '#D6F76B',
+      contrastText: '#153A30',
     },
     background: {
-      default: '#F7F5F0',
+      default: '#FAF9F5',
       paper: '#FFFFFF',
     },
     text: {
@@ -28,7 +29,7 @@ const theme = createTheme({
     },
     divider: '#E3DED0',
     success: {
-      main: '#2F5D50',
+      main: '#1F4B3F',
     },
     error: {
       main: '#B3462C',
