@@ -3,3 +3,10 @@
 
 # Node dependencies
 node_modules/
+
+
+.env
+backend/.env
+node_modules/
+Frontend/node_modules/
+backend/node_modules/
