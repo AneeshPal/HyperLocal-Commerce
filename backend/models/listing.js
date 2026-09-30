@@ -25,7 +25,14 @@ const listingSchema = new mongoose.Schema({
         type: String
     },
 
+    // Cloudinary image URLs
     images: {
+        type: [String],
+        default: []
+    },
+
+    // Matching Cloudinary public IDs
+    imagePublicIds: {
         type: [String],
         default: []
     },
@@ -63,9 +70,9 @@ listingSchema.index({
     location: "2dsphere"
 });
 
-const Listing = mongoose.model("Listing", listingSchema);
+const Listing = mongoose.model(
+    "Listing",
+    listingSchema
+);
 
 export default Listing;
-
-
-
