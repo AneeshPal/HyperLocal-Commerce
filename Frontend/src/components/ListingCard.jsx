@@ -13,16 +13,32 @@ import { useNavigate } from 'react-router-dom';
 export default function ListingCard({ listing }) {
   const navigate = useNavigate();
 
-  // Get the first image from Cloudinary
+  // Get first listing image
   const image =
-    listing.images && listing.images.length > 0
+    Array.isArray(listing.images) &&
+    listing.images.length > 0
       ? listing.images[0]
       : '';
 
-  // Format the listing creation date
+  // Format date
   const postedDate = listing.createdAt
     ? new Date(listing.createdAt).toLocaleDateString('en-IN')
     : '';
+
+  const handleClick = () => {
+    console.log('Clicked listing ID:', listing._id);
+
+    // Prevent /listing/undefined
+    if (!listing._id) {
+      console.error(
+        'Listing _id is missing:',
+        listing
+      );
+      return;
+    }
+
+    navigate(`/listing/${listing._id}`);
+  };
 
   return (
     <Card
@@ -33,24 +49,49 @@ export default function ListingCard({ listing }) {
         overflow: 'hidden',
       }}
     >
-      <CardActionArea
-        onClick={() => navigate(`/listing/${listing._id}`)}
-      >
+      <CardActionArea onClick={handleClick}>
 
-        {/* Listing Image */}
-        <CardMedia
-          component="img"
-          height="150"
-          image={image}
-          alt={listing.title}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
-          sx={{
-            objectFit: 'cover',
-            backgroundColor: '#f5f5f5',
-          }}
-        />
+        {/* ========================= */}
+        {/* LISTING IMAGE */}
+        {/* ========================= */}
+
+        {image ? (
+          <CardMedia
+            component="img"
+            height="150"
+            image={image}
+            alt={listing.title}
+            onError={(e) => {
+              e.currentTarget.style.display =
+                'none';
+            }}
+            sx={{
+              objectFit: 'cover',
+              backgroundColor: '#f5f5f5',
+            }}
+          />
+        ) : (
+          <Box
+            sx={{
+              height: 150,
+              backgroundColor: '#f5f5f5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Typography
+              variant="body2"
+              color="text.secondary"
+            >
+              No image
+            </Typography>
+          </Box>
+        )}
+
+        {/* ========================= */}
+        {/* LISTING INFORMATION */}
+        {/* ========================= */}
 
         <Box sx={{ p: 1.75 }}>
 
@@ -72,10 +113,16 @@ export default function ListingCard({ listing }) {
               fontWeight: 700,
             }}
           >
-            ₹{Number(listing.price).toLocaleString('en-IN')}
+            ₹
+            {Number(
+              listing.price
+            ).toLocaleString('en-IN')}
           </Typography>
 
-          {/* Location */}
+          {/* ========================= */}
+          {/* DISTANCE */}
+          {/* ========================= */}
+
           <Box
             sx={{
               display: 'flex',
@@ -85,23 +132,38 @@ export default function ListingCard({ listing }) {
               color: 'text.secondary',
             }}
           >
-            <RoomOutlinedIcon sx={{ fontSize: 16 }} />
+            <RoomOutlinedIcon
+              sx={{ fontSize: 16 }}
+            />
 
             <Typography variant="caption">
-              {listing.neighborhood || 'Nearby'}
+              {typeof listing.distance ===
+                'number'
+                ? listing.distance === 0
+                  ? 'At your location'
+                  : `${listing.distance} km away`
+                : listing.neighborhood ||
+                  'Distance unavailable'}
             </Typography>
           </Box>
 
-          {/* Condition + Date */}
+          {/* ========================= */}
+          {/* CONDITION + DATE */}
+          {/* ========================= */}
+
           <Box
             sx={{
               display: 'flex',
               gap: 0.75,
               mt: 1,
+              flexWrap: 'wrap',
             }}
           >
             <Chip
-              label={listing.condition || 'Good'}
+              label={
+                listing.condition ||
+                'Good'
+              }
               size="small"
               sx={{
                 bgcolor: '#F2EFE6',

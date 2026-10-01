@@ -26,8 +26,6 @@ export default function ListingDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
-
-  // Currently selected image in gallery
   const [selectedImage, setSelectedImage] = useState(0);
 
   // -----------------------------
@@ -36,25 +34,40 @@ export default function ListingDetail() {
 
   useEffect(() => {
     const fetchListing = async () => {
+      if (!id || id === 'undefined') {
+        setError('Invalid listing ID.');
+        setLoading(false);
+        return;
+      }
+
       try {
+        console.log('Fetching listing:', id);
+
         const response = await fetch(
           `http://localhost:8080/api/listings/${id}`
         );
 
         const data = await response.json();
 
+        console.log('Listing response:', data);
+
         if (!response.ok) {
-          setError(data.message || 'Listing not found');
+          setError(
+            data.message || 'Failed to load listing'
+          );
           return;
         }
 
-        console.log('Listing details:', data);
-
         setListing(data);
-        setSelectedImage(0);
-      } catch (error) {
-        console.error('Listing detail error:', error);
-        setError('Unable to load listing.');
+      } catch (err) {
+        console.error(
+          'Listing fetch error:',
+          err
+        );
+
+        setError(
+          'Unable to load listing.'
+        );
       } finally {
         setLoading(false);
       }
@@ -62,83 +75,6 @@ export default function ListingDetail() {
 
     fetchListing();
   }, [id]);
-
-  // -----------------------------
-  // JWT / CURRENT USER
-  // -----------------------------
-
-  const token = localStorage.getItem('token');
-
-  let currentUserId = null;
-
-  if (token) {
-    try {
-      const payload = JSON.parse(
-        atob(token.split('.')[1])
-      );
-
-      // Your JWT uses "id"
-      currentUserId = payload.id;
-    } catch (error) {
-      console.error('Could not decode JWT:', error);
-    }
-  }
-
-  // -----------------------------
-  // DELETE LISTING
-  // -----------------------------
-
-  const handleDelete = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete this listing?'
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    if (!token) {
-      setError('Please login first.');
-      return;
-    }
-
-    try {
-      setDeleting(true);
-      setError('');
-
-      const response = await fetch(
-        `http://localhost:8080/api/listings/${id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(
-          data.message || 'Failed to delete listing'
-        );
-        setDeleting(false);
-        return;
-      }
-
-      console.log('Listing deleted:', data);
-
-      navigate('/');
-    } catch (error) {
-      console.error('Delete listing error:', error);
-
-      setError(
-        'Something went wrong while deleting.'
-      );
-
-      setDeleting(false);
-    }
-  };
 
   // -----------------------------
   // LOADING
@@ -152,7 +88,7 @@ export default function ListingDetail() {
           textAlign: 'center',
         }}
       >
-        <Typography color="text.secondary">
+        <Typography>
           Loading listing...
         </Typography>
       </Box>
@@ -189,59 +125,144 @@ export default function ListingDetail() {
   }
 
   // -----------------------------
+  // TOKEN / OWNER
+  // -----------------------------
+
+  const token =
+    localStorage.getItem('token');
+
+  let currentUserId = null;
+
+  if (token) {
+    try {
+      const payload = JSON.parse(
+        atob(token.split('.')[1])
+      );
+
+      currentUserId = payload.id || null;
+    } catch (err) {
+      console.error(
+        'JWT decode error:',
+        err
+      );
+    }
+  }
+
+  // -----------------------------
   // IMAGES
   // -----------------------------
 
-  const images =
-    listing.images && listing.images.length > 0
-      ? listing.images
-      : [];
+  const images = Array.isArray(
+    listing.images
+  )
+    ? listing.images
+    : [];
 
   const currentImage =
     images.length > 0
       ? images[selectedImage]
-      : '';
+      : null;
 
   // -----------------------------
   // SELLER
   // -----------------------------
 
+  const seller =
+    listing.seller &&
+    typeof listing.seller === 'object'
+      ? listing.seller
+      : null;
+
   const sellerName =
-    listing.seller?.name || 'Unknown seller';
+    seller?.name || 'Unknown seller';
 
   const sellerEmail =
-    listing.seller?.email || '';
+    seller?.email || '';
+
+  const sellerId =
+    seller?._id || null;
 
   const sellerInitial =
     sellerName.charAt(0).toUpperCase();
 
-  // -----------------------------
-  // OWNER CHECK
-  // -----------------------------
-
-  const sellerId =
-    listing.seller?._id;
-
   const isOwner =
     currentUserId &&
     sellerId &&
-    String(currentUserId) === String(sellerId);
+    String(currentUserId) ===
+      String(sellerId);
 
-  console.log('OWNER CHECK:', {
-    currentUserId,
-    sellerId,
-    isOwner,
-  });
+  // -----------------------------
+  // DELETE
+  // -----------------------------
+
+  const handleDelete = async () => {
+    const confirmed =
+      window.confirm(
+        'Are you sure you want to delete this listing?'
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    if (!token) {
+      setError('Please login first.');
+      return;
+    }
+
+    try {
+      setDeleting(true);
+
+      const response = await fetch(
+        `http://localhost:8080/api/listings/${id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.message ||
+            'Failed to delete listing'
+        );
+        return;
+      }
+
+      console.log(
+        'Listing deleted:',
+        data
+      );
+
+      navigate('/');
+    } catch (err) {
+      console.error(
+        'Delete error:',
+        err
+      );
+
+      setError(
+        'Unable to delete listing.'
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <Box>
 
-      {/* ========================= */}
-      {/* BACK BUTTON */}
-      {/* ========================= */}
-
+      {/* Back */}
       <Button
-        startIcon={<ArrowBackIcon />}
+        startIcon={
+          <ArrowBackIcon />
+        }
         onClick={() => navigate(-1)}
         sx={{
           mb: 2,
@@ -251,37 +272,39 @@ export default function ListingDetail() {
         Back
       </Button>
 
-      <Grid container spacing={4}>
+      <Grid
+        container
+        spacing={4}
+      >
 
         {/* ========================= */}
         {/* IMAGE GALLERY */}
         {/* ========================= */}
 
-        <Grid item xs={12} md={7}>
-
+        <Grid
+          item
+          xs={12}
+          md={7}
+        >
           {images.length > 0 ? (
             <>
-
               {/* Main Image */}
               <Box
                 component="img"
                 src={currentImage}
                 alt={listing.title}
-                onError={(e) => {
-                  e.currentTarget.style.display =
-                    'none';
-                }}
                 sx={{
                   width: '100%',
                   height: 380,
                   objectFit: 'cover',
                   borderRadius: 3,
-                  backgroundColor: '#f5f5f5',
                   display: 'block',
+                  backgroundColor:
+                    '#f5f5f5',
                 }}
               />
 
-              {/* Image Counter */}
+              {/* Counter */}
               <Typography
                 variant="body2"
                 color="text.secondary"
@@ -290,7 +313,8 @@ export default function ListingDetail() {
                   textAlign: 'right',
                 }}
               >
-                {selectedImage + 1} / {images.length}
+                {selectedImage + 1} /{' '}
+                {images.length}
               </Typography>
 
               {/* Thumbnails */}
@@ -303,56 +327,56 @@ export default function ListingDetail() {
                   pb: 1,
                 }}
               >
-                {images.map((image, index) => (
-                  <Box
-                    key={`${image}-${index}`}
-                    component="img"
-                    src={image}
-                    alt={`${listing.title} ${index + 1}`}
-                    onClick={() =>
-                      setSelectedImage(index)
-                    }
-                    sx={{
-                      width: 80,
-                      height: 65,
-                      objectFit: 'cover',
-                      borderRadius: 2,
-                      cursor: 'pointer',
-                      flexShrink: 0,
-
-                      border:
-                        selectedImage === index
-                          ? '3px solid'
-                          : '1px solid',
-
-                      borderColor:
-                        selectedImage === index
-                          ? 'primary.main'
-                          : 'divider',
-
-                      opacity:
-                        selectedImage === index
-                          ? 1
-                          : 0.75,
-
-                      '&:hover': {
-                        opacity: 1,
-                      },
-                    }}
-                  />
-                ))}
+                {images.map(
+                  (image, index) => (
+                    <Box
+                      key={`${image}-${index}`}
+                      component="img"
+                      src={image}
+                      alt={`${listing.title} ${
+                        index + 1
+                      }`}
+                      onClick={() =>
+                        setSelectedImage(
+                          index
+                        )
+                      }
+                      sx={{
+                        width: 80,
+                        height: 65,
+                        objectFit:
+                          'cover',
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        border:
+                          selectedImage ===
+                          index
+                            ? '3px solid'
+                            : '1px solid',
+                        borderColor:
+                          selectedImage ===
+                          index
+                            ? 'primary.main'
+                            : 'divider',
+                        opacity:
+                          selectedImage ===
+                          index
+                            ? 1
+                            : 0.75,
+                      }}
+                    />
+                  )
+                )}
               </Box>
-
             </>
           ) : (
-
-            /* No images */
             <Box
               sx={{
-                width: '100%',
                 height: 380,
                 borderRadius: 3,
-                backgroundColor: '#f5f5f5',
+                backgroundColor:
+                  '#f5f5f5',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -362,20 +386,25 @@ export default function ListingDetail() {
                 No image available
               </Typography>
             </Box>
-
           )}
-
         </Grid>
 
         {/* ========================= */}
-        {/* DETAILS */}
+        {/* LISTING INFORMATION */}
         {/* ========================= */}
 
-        <Grid item xs={12} md={5}>
+        <Grid
+          item
+          xs={12}
+          md={5}
+        >
 
           {/* Category */}
           <Chip
-            label={listing.category}
+            label={
+              listing.category ||
+              'Other'
+            }
             size="small"
             sx={{
               bgcolor: '#F2EFE6',
@@ -392,28 +421,35 @@ export default function ListingDetail() {
           <Typography
             variant="h4"
             sx={{
-              color: 'primary.dark',
+              color:
+                'primary.dark',
               fontWeight: 700,
               mt: 1,
             }}
           >
             ₹
             {Number(
-              listing.price
-            ).toLocaleString('en-IN')}
+              listing.price || 0
+            ).toLocaleString(
+              'en-IN'
+            )}
           </Typography>
 
-          {/* Location + Condition */}
+          {/* Location */}
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems:
+                'center',
               gap: 0.5,
               mt: 1.5,
-              color: 'text.secondary',
+              color:
+                'text.secondary',
             }}
           >
-            <RoomOutlinedIcon fontSize="small" />
+            <RoomOutlinedIcon
+              fontSize="small"
+            />
 
             <Typography variant="body2">
               {listing.neighborhood ||
@@ -421,18 +457,34 @@ export default function ListingDetail() {
             </Typography>
 
             <Typography
-              variant="body2"
               sx={{ mx: 1 }}
             >
               ·
             </Typography>
 
             <Typography variant="body2">
-              {listing.condition}
+              {listing.condition ||
+                'Good'}
             </Typography>
           </Box>
 
-          <Divider sx={{ my: 3 }} />
+          {/* Distance */}
+          {typeof listing.distance ===
+            'number' && (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mt: 0.5 }}
+            >
+              {listing.distance === 0
+                ? 'At your location'
+                : `${listing.distance} km away`}
+            </Typography>
+          )}
+
+          <Divider
+            sx={{ my: 3 }}
+          />
 
           {/* Description */}
           <Typography
@@ -451,9 +503,14 @@ export default function ListingDetail() {
               'No description provided.'}
           </Typography>
 
-          <Divider sx={{ my: 3 }} />
+          <Divider
+            sx={{ my: 3 }}
+          />
 
-          {/* Seller */}
+          {/* ========================= */}
+          {/* SELLER */}
+          {/* ========================= */}
+
           <Typography
             variant="subtitle2"
             color="text.secondary"
@@ -465,14 +522,16 @@ export default function ListingDetail() {
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems:
+                'center',
               gap: 1.5,
               mb: 3,
             }}
           >
             <Avatar
               sx={{
-                bgcolor: 'primary.main',
+                bgcolor:
+                  'primary.main',
               }}
             >
               {sellerInitial}
@@ -503,10 +562,8 @@ export default function ListingDetail() {
               sx={{
                 display: 'flex',
                 gap: 1.5,
-                mb: 2,
               }}
             >
-
               <Button
                 variant="outlined"
                 startIcon={
@@ -525,19 +582,21 @@ export default function ListingDetail() {
               <Button
                 variant="outlined"
                 color="error"
-                startIcon={<DeleteIcon />}
+                startIcon={
+                  <DeleteIcon />
+                }
                 fullWidth
                 disabled={deleting}
-                onClick={handleDelete}
+                onClick={
+                  handleDelete
+                }
               >
                 {deleting
                   ? 'Deleting...'
                   : 'Delete'}
               </Button>
-
             </Box>
           ) : (
-
             /* ========================= */
             /* BUYER ACTIONS */
             /* ========================= */
@@ -548,7 +607,6 @@ export default function ListingDetail() {
                 gap: 1.5,
               }}
             >
-
               <Button
                 variant="outlined"
                 startIcon={
@@ -573,9 +631,7 @@ export default function ListingDetail() {
               >
                 Buy now
               </Button>
-
             </Box>
-
           )}
 
           {/* Payment information */}
@@ -585,14 +641,16 @@ export default function ListingDetail() {
               mt: 3,
               p: 2,
               borderRadius: 2,
-              borderColor: 'divider',
-              bgcolor: '#F2EFE6',
+              borderColor:
+                'divider',
+              bgcolor:
+                '#F2EFE6',
             }}
           >
             <Typography variant="body2">
-              Payment is held safely until you
-              confirm the item was delivered as
-              described.
+              Payment is held safely until
+              you confirm the item was
+              delivered as described.
             </Typography>
           </Paper>
 
