@@ -47,7 +47,6 @@ router.post("/", authMiddleware, async (req, res) => {
     }
 });
 
-
 router.get("/", async (req, res) => {
     try {
         const {
@@ -59,55 +58,198 @@ router.get("/", async (req, res) => {
             maxPrice
         } = req.query;
 
-        if (!longitude || !latitude) {
+        // --------------------------------
+        // Validate coordinates
+        // --------------------------------
+
+        if (
+            longitude === undefined ||
+            latitude === undefined
+        ) {
             return res.status(400).json({
-                message: "Longitude and latitude are required"
+                message:
+                    "Longitude and latitude are required"
             });
         }
 
-        const query = {
-            location: {
-                $near: {
-                    $geometry: {
+        const longitudeNumber = Number(longitude);
+        const latitudeNumber = Number(latitude);
+        const radiusNumber = Number(radius);
+
+        if (
+            !Number.isFinite(longitudeNumber) ||
+            !Number.isFinite(latitudeNumber)
+        ) {
+            return res.status(400).json({
+                message:
+                    "Invalid longitude or latitude"
+            });
+        }
+
+        if (
+            latitudeNumber < -90 ||
+            latitudeNumber > 90
+        ) {
+            return res.status(400).json({
+                message: "Latitude must be between -90 and 90"
+            });
+        }
+
+        if (
+            longitudeNumber < -180 ||
+            longitudeNumber > 180
+        ) {
+            return res.status(400).json({
+                message:
+                    "Longitude must be between -180 and 180"
+            });
+        }
+
+        if (
+            !Number.isFinite(radiusNumber) ||
+            radiusNumber <= 0
+        ) {
+            return res.status(400).json({
+                message:
+                    "Radius must be a positive number"
+            });
+        }
+
+        // --------------------------------
+        // Build optional filters
+        // --------------------------------
+
+        const filters = {};
+
+        if (category) {
+            filters.category = category;
+        }
+
+        if (minPrice !== undefined || maxPrice !== undefined) {
+            filters.price = {};
+
+            if (minPrice !== undefined) {
+                const minPriceNumber = Number(minPrice);
+
+                if (!Number.isFinite(minPriceNumber)) {
+                    return res.status(400).json({
+                        message:
+                            "Invalid minimum price"
+                    });
+                }
+
+                filters.price.$gte = minPriceNumber;
+            }
+
+            if (maxPrice !== undefined) {
+                const maxPriceNumber = Number(maxPrice);
+
+                if (!Number.isFinite(maxPriceNumber)) {
+                    return res.status(400).json({
+                        message:
+                            "Invalid maximum price"
+                    });
+                }
+
+                filters.price.$lte = maxPriceNumber;
+            }
+        }
+
+        // --------------------------------
+        // Geospatial search
+        // --------------------------------
+
+        const listings = await Listing.aggregate([
+            {
+                $geoNear: {
+                    near: {
                         type: "Point",
                         coordinates: [
-                            Number(longitude),
-                            Number(latitude)
+                            longitudeNumber,
+                            latitudeNumber
                         ]
                     },
-                    $maxDistance: Number(radius) * 1000
+
+                    key: "location",
+
+                    distanceField: "distanceInMeters",
+
+                    maxDistance:
+                        radiusNumber * 1000,
+
+                    spherical: true,
+
+                    query: filters
+                }
+            },
+
+            // --------------------------------
+            // Convert meters to kilometers
+            // --------------------------------
+
+            {
+                $addFields: {
+                    distance: {
+                        $round: [
+                            {
+                                $divide: [
+                                    "$distanceInMeters",
+                                    1000
+                                ]
+                            },
+                            2
+                        ]
+                    }
+                }
+            },
+
+            // --------------------------------
+            // Populate seller
+            // --------------------------------
+
+            {
+                $lookup: {
+                    from: "users",
+
+                    localField: "seller",
+
+                    foreignField: "_id",
+
+                    as: "seller"
+                }
+            },
+
+            {
+                $unwind: {
+                    path: "$seller",
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+
+            // --------------------------------
+            // Remove internal distance field
+            // --------------------------------
+
+            {
+                $project: {
+                    distanceInMeters: 0,
+
+                    "seller.password": 0
                 }
             }
-        };
-
-        // Category filter
-        if (category) {
-            query.category = category;
-        }
-
-        // Price filter
-        if (minPrice || maxPrice) {
-            query.price = {};
-
-            if (minPrice) {
-                query.price.$gte = Number(minPrice);
-            }
-
-            if (maxPrice) {
-                query.price.$lte = Number(maxPrice);
-            }
-        }
-
-        const listings = await Listing.find(query)
-            .populate("seller", "name email");
+        ]);
 
         res.json(listings);
 
     } catch (error) {
-        console.error(error);
+        console.error(
+            "Get listings error:",
+            error
+        );
 
         res.status(500).json({
-            message: "Failed to fetch listings"
+            message:
+                "Failed to fetch listings"
         });
     }
 });
