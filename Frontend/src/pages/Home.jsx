@@ -6,6 +6,7 @@ import {
   Chip,
   Grid,
   TextField,
+  Button,
 } from '@mui/material';
 
 import { useOutletContext } from 'react-router-dom';
@@ -14,17 +15,16 @@ import ListingCard from '../components/ListingCard';
 import { categories } from '../data/mockData';
 
 export default function Home() {
-  // Search comes from AppShell
-  const { search } = useOutletContext();
-
-  // --------------------------------
-  // FILTER STATES
-  // --------------------------------
+  const {
+    search,
+    setSearch,
+  } = useOutletContext();
 
   const [activeCategory, setActiveCategory] =
     useState('All');
 
-  const [radius, setRadius] = useState(3);
+  const [radius, setRadius] =
+    useState(3);
 
   const [minPrice, setMinPrice] =
     useState('');
@@ -32,23 +32,11 @@ export default function Home() {
   const [maxPrice, setMaxPrice] =
     useState('');
 
-  // --------------------------------
-  // LOCATION
-  // --------------------------------
-
   const [location, setLocation] =
     useState(null);
 
-  // --------------------------------
-  // LISTINGS
-  // --------------------------------
-
   const [listings, setListings] =
     useState([]);
-
-  // --------------------------------
-  // UI STATES
-  // --------------------------------
 
   const [loading, setLoading] =
     useState(true);
@@ -60,7 +48,7 @@ export default function Home() {
     useState('');
 
   // =================================
-  // GET USER LOCATION
+  // LOCATION
   // =================================
 
   useEffect(() => {
@@ -71,26 +59,18 @@ export default function Home() {
 
       setLocationLoading(false);
       setLoading(false);
-
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const userLocation = {
+        setLocation({
           latitude:
             position.coords.latitude,
-
           longitude:
             position.coords.longitude,
-        };
+        });
 
-        console.log(
-          'User location:',
-          userLocation
-        );
-
-        setLocation(userLocation);
         setLocationLoading(false);
       },
 
@@ -130,7 +110,21 @@ export default function Home() {
       setError('');
 
       try {
-        // Category
+        // Validate prices
+        if (
+          minPrice &&
+          maxPrice &&
+          Number(minPrice) >
+            Number(maxPrice)
+        ) {
+          setError(
+            'Minimum price cannot be greater than maximum price.'
+          );
+
+          setLoading(false);
+          return;
+        }
+
         const categoryQuery =
           activeCategory === 'All'
             ? ''
@@ -138,12 +132,10 @@ export default function Home() {
                 activeCategory
               )}`;
 
-        // Price
         const priceQuery =
           `${minPrice ? `&minPrice=${minPrice}` : ''}` +
           `${maxPrice ? `&maxPrice=${maxPrice}` : ''}`;
 
-        // Search from AppShell
         const searchQuery =
           search.trim()
             ? `&search=${encodeURIComponent(
@@ -163,14 +155,8 @@ export default function Home() {
             data.message ||
               'Failed to fetch listings'
           );
-
           return;
         }
-
-        console.log(
-          'Nearby listings:',
-          data
-        );
 
         setListings(data);
 
@@ -200,13 +186,22 @@ export default function Home() {
     search,
   ]);
 
+  // =================================
+  // RESET FILTERS
+  // =================================
+
+  const resetFilters = () => {
+    setActiveCategory('All');
+    setRadius(3);
+    setMinPrice('');
+    setMaxPrice('');
+    setSearch('');
+  };
+
   return (
     <Box>
 
-      {/* ========================= */}
-      {/* HEADING */}
-      {/* ========================= */}
-
+      {/* Heading */}
       <Typography
         variant="h4"
         sx={{ mb: 0.5 }}
@@ -214,10 +209,7 @@ export default function Home() {
         What's nearby
       </Typography>
 
-      {/* ========================= */}
-      {/* FILTERS */}
-      {/* ========================= */}
-
+      {/* Filters */}
       <Box
         sx={{
           display: 'flex',
@@ -228,7 +220,6 @@ export default function Home() {
         }}
       >
 
-        {/* Count */}
         <Typography
           variant="body2"
           color="text.secondary"
@@ -314,12 +305,18 @@ export default function Home() {
           }}
         />
 
+        {/* Reset */}
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={resetFilters}
+        >
+          Reset
+        </Button>
+
       </Box>
 
-      {/* ========================= */}
-      {/* CATEGORIES */}
-      {/* ========================= */}
-
+      {/* Categories */}
       <Box
         sx={{
           display: 'flex',
@@ -358,10 +355,7 @@ export default function Home() {
         ))}
       </Box>
 
-      {/* ========================= */}
-      {/* LOADING */}
-      {/* ========================= */}
-
+      {/* Loading */}
       {loading && (
         <Typography
           color="text.secondary"
@@ -372,10 +366,7 @@ export default function Home() {
         </Typography>
       )}
 
-      {/* ========================= */}
-      {/* ERROR */}
-      {/* ========================= */}
-
+      {/* Error */}
       {error && (
         <Typography
           color="error"
@@ -385,10 +376,7 @@ export default function Home() {
         </Typography>
       )}
 
-      {/* ========================= */}
-      {/* LISTINGS */}
-      {/* ========================= */}
-
+      {/* Listings */}
       {!loading &&
         !error && (
           <Grid
@@ -414,10 +402,7 @@ export default function Home() {
           </Grid>
         )}
 
-      {/* ========================= */}
-      {/* EMPTY */}
-      {/* ========================= */}
-
+      {/* Empty */}
       {!loading &&
         !error &&
         listings.length === 0 && (

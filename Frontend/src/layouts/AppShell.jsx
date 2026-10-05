@@ -70,7 +70,6 @@ export default function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Search state shared with Home
   const [search, setSearch] = useState('');
 
   const unreadCount = notifications.filter(
@@ -86,10 +85,7 @@ export default function AppShell() {
       }}
     >
 
-      {/* ========================= */}
-      {/* SIDEBAR */}
-      {/* ========================= */}
-
+      {/* Sidebar */}
       <Drawer
         variant="permanent"
         sx={{
@@ -105,8 +101,6 @@ export default function AppShell() {
           },
         }}
       >
-
-        {/* Logo */}
         <Box sx={{ px: 3, py: 3 }}>
           <Typography
             variant="h5"
@@ -128,7 +122,6 @@ export default function AppShell() {
           </Typography>
         </Box>
 
-        {/* Navigation */}
         <List sx={{ px: 1.5 }}>
           {navItems.map((item) => {
             const selected =
@@ -182,7 +175,6 @@ export default function AppShell() {
           })}
         </List>
 
-        {/* User */}
         <Box
           sx={{
             mt: 'auto',
@@ -230,13 +222,9 @@ export default function AppShell() {
             </Box>
           </Box>
         </Box>
-
       </Drawer>
 
-      {/* ========================= */}
-      {/* MAIN CONTENT */}
-      {/* ========================= */}
-
+      {/* Main */}
       <Box
         sx={{
           flexGrow: 1,
@@ -244,8 +232,6 @@ export default function AppShell() {
           flexDirection: 'column',
         }}
       >
-
-        {/* Top Bar */}
         <AppBar
           position="sticky"
           color="transparent"
@@ -255,7 +241,6 @@ export default function AppShell() {
         >
           <Toolbar sx={{ gap: 2 }}>
 
-            {/* Location */}
             <Chip
               icon={
                 <RoomOutlinedIcon
@@ -264,7 +249,7 @@ export default function AppShell() {
               }
               label={
                 currentUser.neighborhood +
-                ' · within 3 km'
+                ' · nearby'
               }
               variant="outlined"
               sx={{
@@ -309,7 +294,6 @@ export default function AppShell() {
 
             <Box sx={{ flexGrow: 1 }} />
 
-            {/* Notifications */}
             <IconButton
               onClick={() =>
                 navigate('/notifications')
@@ -326,16 +310,19 @@ export default function AppShell() {
           </Toolbar>
         </AppBar>
 
-        {/* Pages */}
         <Box
           sx={{
             flexGrow: 1,
             p: 4,
           }}
         >
-          <Outlet context={{ search }} />
+          <Outlet
+            context={{
+              search,
+              setSearch,
+            }}
+          />
         </Box>
-
       </Box>
     </Box>
   );
