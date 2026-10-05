@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import {
+  Outlet,
+  useNavigate,
+  useLocation,
+} from 'react-router-dom';
+
 import {
   Box,
   Drawer,
@@ -16,6 +21,7 @@ import {
   Chip,
   IconButton,
 } from '@mui/material';
+
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlineOutlined';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
@@ -24,30 +30,72 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutlineOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import RoomOutlinedIcon from '@mui/icons-material/RoomOutlined';
-import { currentUser, notifications } from '../data/mockData';
+
+import {
+  currentUser,
+  notifications,
+} from '../data/mockData';
 
 const DRAWER_WIDTH = 232;
 
 const navItems = [
-  { label: 'Nearby', icon: <StorefrontOutlinedIcon />, path: '/' },
-  { label: 'Sell something', icon: <AddCircleOutlineIcon />, path: '/create-listing' },
-  { label: 'Messages', icon: <ChatBubbleOutlineIcon />, path: '/chat' },
-  { label: 'Orders', icon: <ReceiptLongOutlinedIcon />, path: '/orders' },
-  { label: 'Profile', icon: <PersonOutlineIcon />, path: '/profile' },
+  {
+    label: 'Nearby',
+    icon: <StorefrontOutlinedIcon />,
+    path: '/',
+  },
+  {
+    label: 'Sell something',
+    icon: <AddCircleOutlineIcon />,
+    path: '/create-listing',
+  },
+  {
+    label: 'Messages',
+    icon: <ChatBubbleOutlineIcon />,
+    path: '/chat',
+  },
+  {
+    label: 'Orders',
+    icon: <ReceiptLongOutlinedIcon />,
+    path: '/orders',
+  },
+  {
+    label: 'Profile',
+    icon: <PersonOutlineIcon />,
+    path: '/profile',
+  },
 ];
 
 export default function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Search state shared with Home
+  const [search, setSearch] = useState('');
+
+  const unreadCount = notifications.filter(
+    (n) => !n.read
+  ).length;
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+      }}
+    >
+
+      {/* ========================= */}
+      {/* SIDEBAR */}
+      {/* ========================= */}
+
       <Drawer
         variant="permanent"
         sx={{
           width: DRAWER_WIDTH,
           flexShrink: 0,
+
           '& .MuiDrawer-paper': {
             width: DRAWER_WIDTH,
             boxSizing: 'border-box',
@@ -57,42 +105,90 @@ export default function AppShell() {
           },
         }}
       >
+
+        {/* Logo */}
         <Box sx={{ px: 3, py: 3 }}>
-          <Typography variant="h5" sx={{ color: 'primary.dark', letterSpacing: '-0.02em' }}>
+          <Typography
+            variant="h5"
+            sx={{
+              color: 'primary.dark',
+              letterSpacing: '-0.02em',
+            }}
+          >
             Aas-Paas
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+
+          <Typography
+            variant="caption"
+            sx={{
+              color: 'text.secondary',
+            }}
+          >
             buy & sell nearby
           </Typography>
         </Box>
+
+        {/* Navigation */}
         <List sx={{ px: 1.5 }}>
           {navItems.map((item) => {
             const selected =
-              item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
+              item.path === '/'
+                ? location.pathname === '/'
+                : location.pathname.startsWith(
+                    item.path
+                  );
+
             return (
               <ListItemButton
                 key={item.path}
                 selected={selected}
-                onClick={() => navigate(item.path)}
+                onClick={() =>
+                  navigate(item.path)
+                }
                 sx={{
                   borderRadius: 2,
                   mb: 0.5,
+
                   '&.Mui-selected': {
                     bgcolor: 'primary.main',
-                    color: 'primary.contrastText',
-                    '& .MuiListItemIcon-root': { color: 'primary.contrastText' },
-                    '&:hover': { bgcolor: 'primary.dark' },
+                    color:
+                      'primary.contrastText',
+
+                    '& .MuiListItemIcon-root': {
+                      color:
+                        'primary.contrastText',
+                    },
+
+                    '&:hover': {
+                      bgcolor: 'primary.dark',
+                    },
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 40, color: 'text.secondary' }}>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.label} />
+                <ListItemIcon
+                  sx={{
+                    minWidth: 40,
+                    color: 'text.secondary',
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+
+                <ListItemText
+                  primary={item.label}
+                />
               </ListItemButton>
             );
           })}
         </List>
 
-        <Box sx={{ mt: 'auto', p: 2 }}>
+        {/* User */}
+        <Box
+          sx={{
+            mt: 'auto',
+            p: 2,
+          }}
+        >
           <Box
             sx={{
               display: 'flex',
@@ -103,30 +199,81 @@ export default function AppShell() {
               bgcolor: '#F2EFE6',
               cursor: 'pointer',
             }}
-            onClick={() => navigate('/profile')}
+            onClick={() =>
+              navigate('/profile')
+            }
           >
-            <Avatar src={currentUser.avatar} sx={{ width: 36, height: 36 }} />
+            <Avatar
+              src={currentUser.avatar}
+              sx={{
+                width: 36,
+                height: 36,
+              }}
+            />
+
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="body2" fontWeight={600} noWrap>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                noWrap
+              >
                 {currentUser.name}
               </Typography>
-              <Typography variant="caption" color="text.secondary" noWrap>
+
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                noWrap
+              >
                 {currentUser.neighborhood}
               </Typography>
             </Box>
           </Box>
         </Box>
+
       </Drawer>
 
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-        <AppBar position="sticky" color="transparent" sx={{ bgcolor: 'background.paper' }}>
+      {/* ========================= */}
+      {/* MAIN CONTENT */}
+      {/* ========================= */}
+
+      <Box
+        sx={{
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+
+        {/* Top Bar */}
+        <AppBar
+          position="sticky"
+          color="transparent"
+          sx={{
+            bgcolor: 'background.paper',
+          }}
+        >
           <Toolbar sx={{ gap: 2 }}>
+
+            {/* Location */}
             <Chip
-              icon={<RoomOutlinedIcon sx={{ fontSize: 18 }} />}
-              label={currentUser.neighborhood + ' · within 3 km'}
+              icon={
+                <RoomOutlinedIcon
+                  sx={{ fontSize: 18 }}
+                />
+              }
+              label={
+                currentUser.neighborhood +
+                ' · within 3 km'
+              }
               variant="outlined"
-              sx={{ borderColor: 'divider', fontWeight: 500 }}
+              sx={{
+                borderColor: 'divider',
+                fontWeight: 500,
+              }}
             />
+
+            {/* Search */}
             <Box
               sx={{
                 flexGrow: 1,
@@ -139,21 +286,56 @@ export default function AppShell() {
                 maxWidth: 420,
               }}
             >
-              <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} fontSize="small" />
-              <InputBase placeholder="Search nearby listings" fullWidth sx={{ fontSize: 14 }} />
+              <SearchIcon
+                sx={{
+                  color: 'text.secondary',
+                  mr: 1,
+                }}
+                fontSize="small"
+              />
+
+              <InputBase
+                placeholder="Search nearby listings"
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                fullWidth
+                sx={{
+                  fontSize: 14,
+                }}
+              />
             </Box>
+
             <Box sx={{ flexGrow: 1 }} />
-            <IconButton onClick={() => navigate('/notifications')}>
-              <Badge badgeContent={unreadCount} color="secondary">
+
+            {/* Notifications */}
+            <IconButton
+              onClick={() =>
+                navigate('/notifications')
+              }
+            >
+              <Badge
+                badgeContent={unreadCount}
+                color="secondary"
+              >
                 <NotificationsNoneIcon />
               </Badge>
             </IconButton>
+
           </Toolbar>
         </AppBar>
 
-        <Box sx={{ flexGrow: 1, p: 4 }}>
-          <Outlet />
+        {/* Pages */}
+        <Box
+          sx={{
+            flexGrow: 1,
+            p: 4,
+          }}
+        >
+          <Outlet context={{ search }} />
         </Box>
+
       </Box>
     </Box>
   );

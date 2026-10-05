@@ -8,27 +8,56 @@ import {
   TextField,
 } from '@mui/material';
 
+import { useOutletContext } from 'react-router-dom';
+
 import ListingCard from '../components/ListingCard';
 import { categories } from '../data/mockData';
 
 export default function Home() {
+  // Search comes from AppShell
+  const { search } = useOutletContext();
+
+  // --------------------------------
+  // FILTER STATES
+  // --------------------------------
+
   const [activeCategory, setActiveCategory] =
     useState('All');
 
   const [radius, setRadius] = useState(3);
 
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [minPrice, setMinPrice] =
+    useState('');
 
-  const [location, setLocation] = useState(null);
+  const [maxPrice, setMaxPrice] =
+    useState('');
 
-  const [listings, setListings] = useState([]);
+  // --------------------------------
+  // LOCATION
+  // --------------------------------
 
-  const [loading, setLoading] = useState(true);
+  const [location, setLocation] =
+    useState(null);
+
+  // --------------------------------
+  // LISTINGS
+  // --------------------------------
+
+  const [listings, setListings] =
+    useState([]);
+
+  // --------------------------------
+  // UI STATES
+  // --------------------------------
+
+  const [loading, setLoading] =
+    useState(true);
+
   const [locationLoading, setLocationLoading] =
     useState(true);
 
-  const [error, setError] = useState('');
+  const [error, setError] =
+    useState('');
 
   // =================================
   // GET USER LOCATION
@@ -42,14 +71,18 @@ export default function Home() {
 
       setLocationLoading(false);
       setLoading(false);
+
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const userLocation = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude:
+            position.coords.latitude,
+
+          longitude:
+            position.coords.longitude,
         };
 
         console.log(
@@ -97,7 +130,7 @@ export default function Home() {
       setError('');
 
       try {
-        // Category query
+        // Category
         const categoryQuery =
           activeCategory === 'All'
             ? ''
@@ -105,22 +138,32 @@ export default function Home() {
                 activeCategory
               )}`;
 
-        // Price query
+        // Price
         const priceQuery =
           `${minPrice ? `&minPrice=${minPrice}` : ''}` +
           `${maxPrice ? `&maxPrice=${maxPrice}` : ''}`;
 
+        // Search from AppShell
+        const searchQuery =
+          search.trim()
+            ? `&search=${encodeURIComponent(
+                search.trim()
+              )}`
+            : '';
+
         const response = await fetch(
-          `http://localhost:8080/api/listings?longitude=${location.longitude}&latitude=${location.latitude}&radius=${radius}${categoryQuery}${priceQuery}`
+          `http://localhost:8080/api/listings?longitude=${location.longitude}&latitude=${location.latitude}&radius=${radius}${categoryQuery}${priceQuery}${searchQuery}`
         );
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!response.ok) {
           setError(
             data.message ||
               'Failed to fetch listings'
           );
+
           return;
         }
 
@@ -130,6 +173,7 @@ export default function Home() {
         );
 
         setListings(data);
+
       } catch (error) {
         console.error(
           'Listings API error:',
@@ -139,24 +183,30 @@ export default function Home() {
         setError(
           'Unable to load nearby listings.'
         );
+
       } finally {
         setLoading(false);
       }
     };
 
     fetchListings();
+
   }, [
     location,
     radius,
     activeCategory,
     minPrice,
     maxPrice,
+    search,
   ]);
 
   return (
     <Box>
 
-      {/* Heading */}
+      {/* ========================= */}
+      {/* HEADING */}
+      {/* ========================= */}
+
       <Typography
         variant="h4"
         sx={{ mb: 0.5 }}
@@ -164,7 +214,10 @@ export default function Home() {
         What's nearby
       </Typography>
 
-      {/* Filters */}
+      {/* ========================= */}
+      {/* FILTERS */}
+      {/* ========================= */}
+
       <Box
         sx={{
           display: 'flex',
@@ -175,7 +228,7 @@ export default function Home() {
         }}
       >
 
-        {/* Listing count */}
+        {/* Count */}
         <Typography
           variant="body2"
           color="text.secondary"
@@ -195,14 +248,16 @@ export default function Home() {
           size="small"
           value={radius}
           onChange={(e) => {
-            const value = e.target.value;
+            const value =
+              e.target.value;
 
             if (value === '') {
               setRadius('');
               return;
             }
 
-            const number = Number(value);
+            const number =
+              Number(value);
 
             if (
               number >= 1 &&
@@ -211,7 +266,9 @@ export default function Home() {
               setRadius(number);
             }
           }}
-          sx={{ width: 110 }}
+          sx={{
+            width: 110,
+          }}
           inputProps={{
             min: 1,
             max: 50,
@@ -219,31 +276,39 @@ export default function Home() {
           }}
         />
 
-        {/* Minimum price */}
+        {/* Min Price */}
         <TextField
           label="Min ₹"
           type="number"
           size="small"
           value={minPrice}
           onChange={(e) =>
-            setMinPrice(e.target.value)
+            setMinPrice(
+              e.target.value
+            )
           }
-          sx={{ width: 100 }}
+          sx={{
+            width: 100,
+          }}
           inputProps={{
             min: 0,
           }}
         />
 
-        {/* Maximum price */}
+        {/* Max Price */}
         <TextField
           label="Max ₹"
           type="number"
           size="small"
           value={maxPrice}
           onChange={(e) =>
-            setMaxPrice(e.target.value)
+            setMaxPrice(
+              e.target.value
+            )
           }
-          sx={{ width: 100 }}
+          sx={{
+            width: 100,
+          }}
           inputProps={{
             min: 0,
           }}
@@ -251,7 +316,10 @@ export default function Home() {
 
       </Box>
 
-      {/* Categories */}
+      {/* ========================= */}
+      {/* CATEGORIES */}
+      {/* ========================= */}
+
       <Box
         sx={{
           display: 'flex',
@@ -290,16 +358,24 @@ export default function Home() {
         ))}
       </Box>
 
-      {/* Loading */}
+      {/* ========================= */}
+      {/* LOADING */}
+      {/* ========================= */}
+
       {loading && (
-        <Typography color="text.secondary">
+        <Typography
+          color="text.secondary"
+        >
           {locationLoading
             ? 'Requesting your location...'
             : 'Finding listings...'}
         </Typography>
       )}
 
-      {/* Error */}
+      {/* ========================= */}
+      {/* ERROR */}
+      {/* ========================= */}
+
       {error && (
         <Typography
           color="error"
@@ -309,30 +385,39 @@ export default function Home() {
         </Typography>
       )}
 
-      {/* Listings */}
-      {!loading && !error && (
-        <Grid
-          container
-          spacing={2.5}
-        >
-          {listings.map((listing) => (
-            <Grid
-              item
-              xs={12}
-              sm={6}
-              md={4}
-              lg={3}
-              key={listing._id}
-            >
-              <ListingCard
-                listing={listing}
-              />
-            </Grid>
-          ))}
-        </Grid>
-      )}
+      {/* ========================= */}
+      {/* LISTINGS */}
+      {/* ========================= */}
 
-      {/* Empty */}
+      {!loading &&
+        !error && (
+          <Grid
+            container
+            spacing={2.5}
+          >
+            {listings.map(
+              (listing) => (
+                <Grid
+                  item
+                  xs={12}
+                  sm={6}
+                  md={4}
+                  lg={3}
+                  key={listing._id}
+                >
+                  <ListingCard
+                    listing={listing}
+                  />
+                </Grid>
+              )
+            )}
+          </Grid>
+        )}
+
+      {/* ========================= */}
+      {/* EMPTY */}
+      {/* ========================= */}
+
       {!loading &&
         !error &&
         listings.length === 0 && (
@@ -345,7 +430,8 @@ export default function Home() {
             }}
           >
             <Typography>
-              No listings match your filters.
+              No listings match your
+              filters.
             </Typography>
           </Box>
         )}
