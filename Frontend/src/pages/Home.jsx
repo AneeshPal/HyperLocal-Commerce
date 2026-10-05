@@ -1,23 +1,42 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, Chip, Grid } from '@mui/material';
+
+import {
+  Box,
+  Typography,
+  Chip,
+  Grid,
+  TextField,
+} from '@mui/material';
+
 import ListingCard from '../components/ListingCard';
 import { categories } from '../data/mockData';
 
 export default function Home() {
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] =
+    useState('All');
 
-  const [listings, setListings] = useState([]);
+  const [radius, setRadius] = useState(3);
 
-  const [loading, setLoading] = useState(true);
-  const [locationLoading, setLocationLoading] = useState(true);
+  const [location, setLocation] =
+    useState(null);
 
-  const [error, setError] = useState('');
+  const [listings, setListings] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [locationLoading, setLocationLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState('');
+
+  // =================================
+  // GET USER LOCATION
+  // =================================
 
   useEffect(() => {
-    // --------------------------------
-    // STEP 1: GET USER LOCATION
-    // --------------------------------
-
     if (!navigator.geolocation) {
       setError(
         'Geolocation is not supported by this browser.'
@@ -30,88 +49,35 @@ export default function Home() {
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
+      (position) => {
+        const userLocation = {
+          latitude:
+            position.coords.latitude,
+          longitude:
+            position.coords.longitude,
+        };
 
-        console.log('User latitude:', latitude);
-        console.log('User longitude:', longitude);
+        console.log(
+          'User location:',
+          userLocation
+        );
 
+        setLocation(userLocation);
         setLocationLoading(false);
-
-        // --------------------------------
-        // STEP 2: FETCH NEARBY LISTINGS
-        // --------------------------------
-
-        try {
-          const response = await fetch(
-            `http://localhost:8080/api/listings?longitude=${longitude}&latitude=${latitude}&radius=3`
-          );
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            setError(
-              data.message ||
-              'Failed to fetch listings'
-            );
-
-            return;
-          }
-
-          console.log(
-            'Nearby listings:',
-            data
-          );
-
-          setListings(data);
-        } catch (error) {
-          console.error(
-            'Listings API error:',
-            error
-          );
-
-          setError(
-            'Unable to load nearby listings.'
-          );
-        } finally {
-          setLoading(false);
-        }
       },
 
       (error) => {
         console.error(
-          'Geolocation error:',
+          'Location error:',
           error
+        );
+
+        setError(
+          'Location permission is required to find nearby listings.'
         );
 
         setLocationLoading(false);
         setLoading(false);
-
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            setError(
-              'Location permission was denied. Please allow location access to see nearby listings.'
-            );
-            break;
-
-          case error.POSITION_UNAVAILABLE:
-            setError(
-              'Your location could not be determined.'
-            );
-            break;
-
-          case error.TIMEOUT:
-            setError(
-              'Getting your location took too long. Please try again.'
-            );
-            break;
-
-          default:
-            setError(
-              'Unable to get your location.'
-            );
-        }
       },
 
       {
@@ -122,26 +88,75 @@ export default function Home() {
     );
   }, []);
 
-  // --------------------------------
-  // CATEGORY FILTER
-  // --------------------------------
+  // =================================
+  // FETCH LISTINGS
+  // =================================
 
-  const filtered =
-    activeCategory === 'All'
-      ? listings
-      : listings.filter(
-          (listing) =>
-            listing.category === activeCategory
+  useEffect(() => {
+    if (!location || !radius) {
+      return;
+    }
+
+    const fetchListings = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const categoryQuery =
+          activeCategory === 'All'
+            ? ''
+            : `&category=${encodeURIComponent(
+                activeCategory
+              )}`;
+
+        const response = await fetch(
+          `http://localhost:8080/api/listings?longitude=${location.longitude}&latitude=${location.latitude}&radius=${radius}${categoryQuery}`
         );
 
-  // --------------------------------
-  // UI
-  // --------------------------------
+        const data = await response.json();
+
+        if (!response.ok) {
+          setError(
+            data.message ||
+              'Failed to fetch listings'
+          );
+
+          return;
+        }
+
+        console.log(
+          'Nearby listings:',
+          data
+        );
+
+        setListings(data);
+
+      } catch (error) {
+        console.error(
+          'Listings API error:',
+          error
+        );
+
+        setError(
+          'Unable to load nearby listings.'
+        );
+
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchListings();
+
+  }, [location, radius, activeCategory]);
 
   return (
     <Box>
 
-      {/* Heading */}
+      {/* ========================= */}
+      {/* HEADING */}
+      {/* ========================= */}
+
       <Typography
         variant="h4"
         sx={{ mb: 0.5 }}
@@ -149,20 +164,69 @@ export default function Home() {
         What's nearby
       </Typography>
 
-      {/* Location / listings count */}
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        sx={{ mb: 3 }}
-      >
-        {locationLoading
-          ? 'Getting your location...'
-          : loading
-            ? 'Loading nearby listings...'
-            : `${filtered.length} listings within 3 km of you`}
-      </Typography>
+      {/* ========================= */}
+      {/* RADIUS + COUNT */}
+      {/* ========================= */}
 
-      {/* Categories */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          mb: 3,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Typography
+          variant="body2"
+          color="text.secondary"
+        >
+          {locationLoading
+            ? 'Getting your location...'
+            : loading
+              ? 'Finding nearby listings...'
+              : `${listings.length} listings within ${radius} km`}
+        </Typography>
+
+        <TextField
+          label="Radius (km)"
+          type="number"
+          size="small"
+          value={radius}
+          onChange={(e) => {
+            const value =
+              e.target.value;
+
+            if (value === '') {
+              setRadius('');
+              return;
+            }
+
+            const number =
+              Number(value);
+
+            if (
+              number >= 1 &&
+              number <= 50
+            ) {
+              setRadius(number);
+            }
+          }}
+          sx={{
+            width: 110,
+          }}
+          inputProps={{
+            min: 1,
+            max: 50,
+            step: 0.5,
+          }}
+        />
+      </Box>
+
+      {/* ========================= */}
+      {/* CATEGORY FILTER */}
+      {/* ========================= */}
+
       <Box
         sx={{
           display: 'flex',
@@ -190,27 +254,33 @@ export default function Home() {
             }
             sx={{
               borderColor: 'divider',
-
               fontWeight: 500,
 
               ...(activeCategory !== cat && {
-                bgcolor: 'background.paper',
+                bgcolor:
+                  'background.paper',
               }),
             }}
           />
         ))}
       </Box>
 
-      {/* Loading */}
+      {/* ========================= */}
+      {/* LOADING */}
+      {/* ========================= */}
+
       {loading && (
         <Typography color="text.secondary">
           {locationLoading
             ? 'Requesting your location...'
-            : 'Finding listings near you...'}
+            : 'Finding listings...'}
         </Typography>
       )}
 
-      {/* Error */}
+      {/* ========================= */}
+      {/* ERROR */}
+      {/* ========================= */}
+
       {error && (
         <Typography
           color="error"
@@ -220,10 +290,16 @@ export default function Home() {
         </Typography>
       )}
 
-      {/* Listings */}
+      {/* ========================= */}
+      {/* LISTINGS */}
+      {/* ========================= */}
+
       {!loading && !error && (
-        <Grid container spacing={2.5}>
-          {filtered.map((listing) => (
+        <Grid
+          container
+          spacing={2.5}
+        >
+          {listings.map((listing) => (
             <Grid
               item
               xs={12}
@@ -240,20 +316,27 @@ export default function Home() {
         </Grid>
       )}
 
-      {/* Empty state */}
+      {/* ========================= */}
+      {/* EMPTY */}
+      {/* ========================= */}
+
       {!loading &&
         !error &&
-        filtered.length === 0 && (
+        listings.length === 0 && (
           <Box
             sx={{
               textAlign: 'center',
               py: 8,
-              color: 'text.secondary',
+              color:
+                'text.secondary',
             }}
           >
             <Typography>
-              No listings within 3 km of your
-              current location.
+              No listings found
+              {activeCategory !== 'All'
+                ? ` in ${activeCategory}`
+                : ''}{' '}
+              within {radius} km.
             </Typography>
           </Box>
         )}
