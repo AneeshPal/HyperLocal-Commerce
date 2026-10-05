@@ -17,20 +17,18 @@ export default function Home() {
 
   const [radius, setRadius] = useState(3);
 
-  const [location, setLocation] =
-    useState(null);
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
 
-  const [listings, setListings] =
-    useState([]);
+  const [location, setLocation] = useState(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [listings, setListings] = useState([]);
 
+  const [loading, setLoading] = useState(true);
   const [locationLoading, setLocationLoading] =
     useState(true);
 
-  const [error, setError] =
-    useState('');
+  const [error, setError] = useState('');
 
   // =================================
   // GET USER LOCATION
@@ -44,17 +42,14 @@ export default function Home() {
 
       setLocationLoading(false);
       setLoading(false);
-
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const userLocation = {
-          latitude:
-            position.coords.latitude,
-          longitude:
-            position.coords.longitude,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
         };
 
         console.log(
@@ -102,6 +97,7 @@ export default function Home() {
       setError('');
 
       try {
+        // Category query
         const categoryQuery =
           activeCategory === 'All'
             ? ''
@@ -109,8 +105,13 @@ export default function Home() {
                 activeCategory
               )}`;
 
+        // Price query
+        const priceQuery =
+          `${minPrice ? `&minPrice=${minPrice}` : ''}` +
+          `${maxPrice ? `&maxPrice=${maxPrice}` : ''}`;
+
         const response = await fetch(
-          `http://localhost:8080/api/listings?longitude=${location.longitude}&latitude=${location.latitude}&radius=${radius}${categoryQuery}`
+          `http://localhost:8080/api/listings?longitude=${location.longitude}&latitude=${location.latitude}&radius=${radius}${categoryQuery}${priceQuery}`
         );
 
         const data = await response.json();
@@ -120,7 +121,6 @@ export default function Home() {
             data.message ||
               'Failed to fetch listings'
           );
-
           return;
         }
 
@@ -130,7 +130,6 @@ export default function Home() {
         );
 
         setListings(data);
-
       } catch (error) {
         console.error(
           'Listings API error:',
@@ -140,23 +139,24 @@ export default function Home() {
         setError(
           'Unable to load nearby listings.'
         );
-
       } finally {
         setLoading(false);
       }
     };
 
     fetchListings();
-
-  }, [location, radius, activeCategory]);
+  }, [
+    location,
+    radius,
+    activeCategory,
+    minPrice,
+    maxPrice,
+  ]);
 
   return (
     <Box>
 
-      {/* ========================= */}
-      {/* HEADING */}
-      {/* ========================= */}
-
+      {/* Heading */}
       <Typography
         variant="h4"
         sx={{ mb: 0.5 }}
@@ -164,22 +164,22 @@ export default function Home() {
         What's nearby
       </Typography>
 
-      {/* ========================= */}
-      {/* RADIUS + COUNT */}
-      {/* ========================= */}
-
+      {/* Filters */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 1.5,
+          gap: 1,
           mb: 3,
           flexWrap: 'wrap',
         }}
       >
+
+        {/* Listing count */}
         <Typography
           variant="body2"
           color="text.secondary"
+          sx={{ mr: 0.5 }}
         >
           {locationLoading
             ? 'Getting your location...'
@@ -188,22 +188,21 @@ export default function Home() {
               : `${listings.length} listings within ${radius} km`}
         </Typography>
 
+        {/* Radius */}
         <TextField
           label="Radius (km)"
           type="number"
           size="small"
           value={radius}
           onChange={(e) => {
-            const value =
-              e.target.value;
+            const value = e.target.value;
 
             if (value === '') {
               setRadius('');
               return;
             }
 
-            const number =
-              Number(value);
+            const number = Number(value);
 
             if (
               number >= 1 &&
@@ -212,21 +211,47 @@ export default function Home() {
               setRadius(number);
             }
           }}
-          sx={{
-            width: 110,
-          }}
+          sx={{ width: 110 }}
           inputProps={{
             min: 1,
             max: 50,
             step: 0.5,
           }}
         />
+
+        {/* Minimum price */}
+        <TextField
+          label="Min ₹"
+          type="number"
+          size="small"
+          value={minPrice}
+          onChange={(e) =>
+            setMinPrice(e.target.value)
+          }
+          sx={{ width: 100 }}
+          inputProps={{
+            min: 0,
+          }}
+        />
+
+        {/* Maximum price */}
+        <TextField
+          label="Max ₹"
+          type="number"
+          size="small"
+          value={maxPrice}
+          onChange={(e) =>
+            setMaxPrice(e.target.value)
+          }
+          sx={{ width: 100 }}
+          inputProps={{
+            min: 0,
+          }}
+        />
+
       </Box>
 
-      {/* ========================= */}
-      {/* CATEGORY FILTER */}
-      {/* ========================= */}
-
+      {/* Categories */}
       <Box
         sx={{
           display: 'flex',
@@ -265,10 +290,7 @@ export default function Home() {
         ))}
       </Box>
 
-      {/* ========================= */}
-      {/* LOADING */}
-      {/* ========================= */}
-
+      {/* Loading */}
       {loading && (
         <Typography color="text.secondary">
           {locationLoading
@@ -277,10 +299,7 @@ export default function Home() {
         </Typography>
       )}
 
-      {/* ========================= */}
-      {/* ERROR */}
-      {/* ========================= */}
-
+      {/* Error */}
       {error && (
         <Typography
           color="error"
@@ -290,10 +309,7 @@ export default function Home() {
         </Typography>
       )}
 
-      {/* ========================= */}
-      {/* LISTINGS */}
-      {/* ========================= */}
-
+      {/* Listings */}
       {!loading && !error && (
         <Grid
           container
@@ -316,10 +332,7 @@ export default function Home() {
         </Grid>
       )}
 
-      {/* ========================= */}
-      {/* EMPTY */}
-      {/* ========================= */}
-
+      {/* Empty */}
       {!loading &&
         !error &&
         listings.length === 0 && (
@@ -332,11 +345,7 @@ export default function Home() {
             }}
           >
             <Typography>
-              No listings found
-              {activeCategory !== 'All'
-                ? ` in ${activeCategory}`
-                : ''}{' '}
-              within {radius} km.
+              No listings match your filters.
             </Typography>
           </Box>
         )}
