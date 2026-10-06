@@ -68,6 +68,7 @@ const io = new Server(httpServer, {
 
 
 // When a browser connects
+
 io.on("connection", (socket) => {
 
     console.log(
@@ -76,7 +77,24 @@ io.on("connection", (socket) => {
     );
 
 
-    // When browser disconnects
+    // Join a conversation room
+
+    socket.on(
+        "joinConversation",
+        (conversationId) => {
+
+            socket.join(conversationId);
+
+            console.log(
+                `Socket ${socket.id} joined conversation ${conversationId}`
+            );
+
+        }
+    );
+
+
+    // Disconnect
+
     socket.on("disconnect", () => {
 
         console.log(
@@ -87,7 +105,6 @@ io.on("connection", (socket) => {
     });
 
 });
-
 
 // ===============================
 // DATABASE CONNECTION
