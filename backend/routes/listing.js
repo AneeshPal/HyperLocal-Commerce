@@ -55,7 +55,8 @@ router.get("/", async (req, res) => {
             radius = 3,
             category,
             minPrice,
-            maxPrice
+            maxPrice,
+            search
         } = req.query;
 
         // --------------------------------
@@ -91,7 +92,8 @@ router.get("/", async (req, res) => {
             latitudeNumber > 90
         ) {
             return res.status(400).json({
-                message: "Latitude must be between -90 and 90"
+                message:
+                    "Latitude must be between -90 and 90"
             });
         }
 
@@ -116,128 +118,151 @@ router.get("/", async (req, res) => {
         }
 
         // --------------------------------
-        // Build optional filters
+        // Build filters
         // --------------------------------
 
         const filters = {};
 
+        // Category
         if (category) {
             filters.category = category;
         }
 
-        if (minPrice !== undefined || maxPrice !== undefined) {
+        // Price
+        if (
+            minPrice !== undefined ||
+            maxPrice !== undefined
+        ) {
             filters.price = {};
 
             if (minPrice !== undefined) {
-                const minPriceNumber = Number(minPrice);
+                const minPriceNumber =
+                    Number(minPrice);
 
-                if (!Number.isFinite(minPriceNumber)) {
+                if (
+                    !Number.isFinite(
+                        minPriceNumber
+                    )
+                ) {
                     return res.status(400).json({
                         message:
                             "Invalid minimum price"
                     });
                 }
 
-                filters.price.$gte = minPriceNumber;
+                filters.price.$gte =
+                    minPriceNumber;
             }
 
             if (maxPrice !== undefined) {
-                const maxPriceNumber = Number(maxPrice);
+                const maxPriceNumber =
+                    Number(maxPrice);
 
-                if (!Number.isFinite(maxPriceNumber)) {
+                if (
+                    !Number.isFinite(
+                        maxPriceNumber
+                    )
+                ) {
                     return res.status(400).json({
                         message:
                             "Invalid maximum price"
                     });
                 }
 
-                filters.price.$lte = maxPriceNumber;
+                filters.price.$lte =
+                    maxPriceNumber;
             }
+        }
+
+        // Search title
+        if (search && search.trim()) {
+            filters.title = {
+                $regex: search.trim(),
+                $options: "i"
+            };
         }
 
         // --------------------------------
         // Geospatial search
         // --------------------------------
 
-        const listings = await Listing.aggregate([
-            {
-                $geoNear: {
-                    near: {
-                        type: "Point",
-                        coordinates: [
-                            longitudeNumber,
-                            latitudeNumber
-                        ]
-                    },
+        const listings =
+            await Listing.aggregate([
+                {
+                    $geoNear: {
+                        near: {
+                            type: "Point",
+                            coordinates: [
+                                longitudeNumber,
+                                latitudeNumber
+                            ]
+                        },
 
-                    key: "location",
+                        key: "location",
 
-                    distanceField: "distanceInMeters",
+                        distanceField:
+                            "distanceInMeters",
 
-                    maxDistance:
-                        radiusNumber * 1000,
+                        maxDistance:
+                            radiusNumber * 1000,
 
-                    spherical: true,
+                        spherical: true,
 
-                    query: filters
-                }
-            },
+                        query: filters
+                    }
+                },
 
-            // --------------------------------
-            // Convert meters to kilometers
-            // --------------------------------
+                // --------------------------------
+                // Convert meters → kilometers
+                // --------------------------------
 
-            {
-                $addFields: {
-                    distance: {
-                        $round: [
-                            {
-                                $divide: [
-                                    "$distanceInMeters",
-                                    1000
-                                ]
-                            },
-                            2
-                        ]
+                {
+                    $addFields: {
+                        distance: {
+                            $round: [
+                                {
+                                    $divide: [
+                                        "$distanceInMeters",
+                                        1000
+                                    ]
+                                },
+                                2
+                            ]
+                        }
+                    }
+                },
+
+                // --------------------------------
+                // Get seller
+                // --------------------------------
+
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "seller",
+                        foreignField: "_id",
+                        as: "seller"
+                    }
+                },
+
+                {
+                    $unwind: {
+                        path: "$seller",
+                        preserveNullAndEmptyArrays: true
+                    }
+                },
+
+                // --------------------------------
+                // Hide unnecessary fields
+                // --------------------------------
+
+                {
+                    $project: {
+                        distanceInMeters: 0,
+                        "seller.password": 0
                     }
                 }
-            },
-
-            // --------------------------------
-            // Populate seller
-            // --------------------------------
-
-            {
-                $lookup: {
-                    from: "users",
-
-                    localField: "seller",
-
-                    foreignField: "_id",
-
-                    as: "seller"
-                }
-            },
-
-            {
-                $unwind: {
-                    path: "$seller",
-                    preserveNullAndEmptyArrays: true
-                }
-            },
-
-            // --------------------------------
-            // Remove internal distance field
-            // --------------------------------
-
-            {
-                $project: {
-                    distanceInMeters: 0,
-
-                    "seller.password": 0
-                }
-            }
-        ]);
+            ]);
 
         res.json(listings);
 
