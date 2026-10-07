@@ -8,9 +8,60 @@ import authMiddleware from "../middleware/auth.js";
 const router = express.Router();
 
 
-// ======================================
-// CREATE OR FIND CONVERSATION
-// ======================================
+// ========================================
+// GET MY CONVERSATIONS
+// ========================================
+
+router.get(
+    "/",
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            const conversations =
+                await Conversation.find({
+                    participants: req.user
+                })
+                .populate(
+                    "participants",
+                    "name email"
+                )
+                .populate(
+                    "listing",
+                    "title price images"
+                )
+                .sort({
+                    createdAt: -1
+                });
+
+
+            res.json(
+                conversations
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Get conversations error:",
+                error
+            );
+
+            res.status(500).json({
+                message:
+                    "Failed to fetch conversations"
+            });
+
+        }
+
+    }
+);
+
+
+// ========================================
+// CREATE / FIND CONVERSATION
+// ========================================
 
 router.post(
     "/",
@@ -19,44 +70,52 @@ router.post(
 
         try {
 
-            const { listingId } = req.body;
+            const {
+                listingId
+            } = req.body;
+
 
             if (!listingId) {
+
                 return res.status(400).json({
-                    message: "listingId is required"
+                    message:
+                        "listingId is required"
                 });
+
             }
 
-
-            // Find the listing
 
             const listing =
-                await Listing.findById(listingId);
+                await Listing.findById(
+                    listingId
+                );
+
 
             if (!listing) {
+
                 return res.status(404).json({
-                    message: "Listing not found"
+                    message:
+                        "Listing not found"
                 });
+
             }
 
-
-            // Seller of this listing
 
             const sellerId =
                 listing.seller.toString();
 
 
-            // Don't allow seller to message themselves
+            if (
+                sellerId === req.user
+            ) {
 
-            if (sellerId === req.user) {
                 return res.status(400).json({
                     message:
                         "You cannot start a conversation with yourself"
                 });
+
             }
 
-
-            // Check if conversation already exists
 
             let conversation =
                 await Conversation.findOne({
@@ -66,12 +125,9 @@ router.post(
                             sellerId
                         ]
                     },
-
                     listing: listingId
                 });
 
-
-            // If it doesn't exist, create it
 
             if (!conversation) {
 
@@ -81,14 +137,11 @@ router.post(
                             req.user,
                             sellerId
                         ],
-
                         listing: listingId
                     });
 
             }
 
-
-            // Return conversation
 
             const populatedConversation =
                 await Conversation.findById(
@@ -119,6 +172,82 @@ router.post(
             res.status(500).json({
                 message:
                     "Failed to create conversation"
+            });
+
+        }
+
+    }
+);
+
+
+// ========================================
+// GET ONE CONVERSATION
+// ========================================
+
+router.get(
+    "/:id",
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            const conversation =
+                await Conversation.findById(
+                    req.params.id
+                )
+                .populate(
+                    "participants",
+                    "name email"
+                )
+                .populate(
+                    "listing",
+                    "title price images seller"
+                );
+
+
+            if (!conversation) {
+
+                return res.status(404).json({
+                    message:
+                        "Conversation not found"
+                });
+
+            }
+
+
+            const isParticipant =
+                conversation.participants.some(
+                    (participant) =>
+                        participant._id.toString() ===
+                        req.user
+                );
+
+
+            if (!isParticipant) {
+
+                return res.status(403).json({
+                    message:
+                        "You are not part of this conversation"
+                });
+
+            }
+
+
+            res.json(
+                conversation
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Get conversation error:",
+                error
+            );
+
+            res.status(500).json({
+                message:
+                    "Failed to fetch conversation"
             });
 
         }

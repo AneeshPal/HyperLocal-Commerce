@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+
+import {
+  useParams,
+  useNavigate,
+} from 'react-router-dom';
 
 import {
   Box,
@@ -18,69 +22,118 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 
+
 export default function ListingDetail() {
+
   const { id } = useParams();
+
   const navigate = useNavigate();
 
-  const [listing, setListing] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [deleting, setDeleting] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(0);
+
+  const [listing, setListing] =
+    useState(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState('');
+
+  const [deleting, setDeleting] =
+    useState(false);
+
+  const [selectedImage, setSelectedImage] =
+    useState(0);
+
 
   // -----------------------------
   // FETCH LISTING
   // -----------------------------
 
   useEffect(() => {
+
     const fetchListing = async () => {
+
       if (!id || id === 'undefined') {
-        setError('Invalid listing ID.');
+
+        setError(
+          'Invalid listing ID.'
+        );
+
         setLoading(false);
+
         return;
       }
 
+
       try {
-        console.log('Fetching listing:', id);
+
+        console.log(
+          'Fetching listing:',
+          id
+        );
+
 
         const response = await fetch(
           `http://localhost:8080/api/listings/${id}`
         );
 
-        const data = await response.json();
 
-        console.log('Listing response:', data);
+        const data =
+          await response.json();
+
+
+        console.log(
+          'Listing response:',
+          data
+        );
+
 
         if (!response.ok) {
+
           setError(
-            data.message || 'Failed to load listing'
+            data.message ||
+            'Failed to load listing'
           );
+
           return;
         }
 
+
         setListing(data);
+
       } catch (err) {
+
         console.error(
           'Listing fetch error:',
           err
         );
 
+
         setError(
           'Unable to load listing.'
         );
+
       } finally {
+
         setLoading(false);
+
       }
+
     };
 
+
     fetchListing();
+
   }, [id]);
+
 
   // -----------------------------
   // LOADING
   // -----------------------------
 
   if (loading) {
+
     return (
       <Box
         sx={{
@@ -93,13 +146,16 @@ export default function ListingDetail() {
         </Typography>
       </Box>
     );
+
   }
+
 
   // -----------------------------
   // ERROR
   // -----------------------------
 
   if (error || !listing) {
+
     return (
       <Box
         sx={{
@@ -107,6 +163,7 @@ export default function ListingDetail() {
           textAlign: 'center',
         }}
       >
+
         <Typography
           color="error"
           sx={{ mb: 2 }}
@@ -114,15 +171,19 @@ export default function ListingDetail() {
           {error || 'Listing not found'}
         </Typography>
 
+
         <Button
           variant="outlined"
           onClick={() => navigate('/')}
         >
           Back to Home
         </Button>
+
       </Box>
     );
+
   }
+
 
   // -----------------------------
   // TOKEN / OWNER
@@ -131,37 +192,49 @@ export default function ListingDetail() {
   const token =
     localStorage.getItem('token');
 
+
   let currentUserId = null;
 
+
   if (token) {
+
     try {
+
       const payload = JSON.parse(
         atob(token.split('.')[1])
       );
 
-      currentUserId = payload.id || null;
+
+      currentUserId =
+        payload.id || null;
+
     } catch (err) {
+
       console.error(
         'JWT decode error:',
         err
       );
+
     }
+
   }
+
 
   // -----------------------------
   // IMAGES
   // -----------------------------
 
-  const images = Array.isArray(
-    listing.images
-  )
-    ? listing.images
-    : [];
+  const images =
+    Array.isArray(listing.images)
+      ? listing.images
+      : [];
+
 
   const currentImage =
     images.length > 0
       ? images[selectedImage]
       : null;
+
 
   // -----------------------------
   // SELLER
@@ -173,17 +246,24 @@ export default function ListingDetail() {
       ? listing.seller
       : null;
 
+
   const sellerName =
     seller?.name || 'Unknown seller';
+
 
   const sellerEmail =
     seller?.email || '';
 
+
   const sellerId =
     seller?._id || null;
 
+
   const sellerInitial =
-    sellerName.charAt(0).toUpperCase();
+    sellerName
+      .charAt(0)
+      .toUpperCase();
+
 
   const isOwner =
     currentUserId &&
@@ -191,32 +271,44 @@ export default function ListingDetail() {
     String(currentUserId) ===
       String(sellerId);
 
+
   // -----------------------------
   // DELETE
   // -----------------------------
 
   const handleDelete = async () => {
+
     const confirmed =
       window.confirm(
         'Are you sure you want to delete this listing?'
       );
 
+
     if (!confirmed) {
       return;
     }
 
+
     if (!token) {
-      setError('Please login first.');
+
+      setError(
+        'Please login first.'
+      );
+
       return;
     }
 
+
     try {
+
       setDeleting(true);
+
 
       const response = await fetch(
         `http://localhost:8080/api/listings/${id}`,
         {
           method: 'DELETE',
+
           headers: {
             Authorization:
               `Bearer ${token}`,
@@ -224,41 +316,143 @@ export default function ListingDetail() {
         }
       );
 
+
       const data =
         await response.json();
 
+
       if (!response.ok) {
+
         setError(
           data.message ||
-            'Failed to delete listing'
+          'Failed to delete listing'
         );
+
         return;
       }
+
 
       console.log(
         'Listing deleted:',
         data
       );
 
+
       navigate('/');
+
     } catch (err) {
+
       console.error(
         'Delete error:',
         err
       );
 
+
       setError(
         'Unable to delete listing.'
       );
+
     } finally {
+
       setDeleting(false);
+
     }
+
   };
 
+
+  // -----------------------------
+  // MESSAGE SELLER
+  // -----------------------------
+
+  const handleMessageSeller = async () => {
+
+    try {
+
+      const token =
+        localStorage.getItem('token');
+
+
+      if (!token) {
+
+        navigate('/login');
+
+        return;
+      }
+
+
+      const response = await fetch(
+        'http://localhost:8080/api/conversations',
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type':
+              'application/json',
+
+            Authorization:
+              `Bearer ${token}`,
+          },
+
+          body: JSON.stringify({
+            listingId: listing._id,
+          }),
+        }
+      );
+
+
+      const data =
+        await response.json();
+
+
+      if (!response.ok) {
+
+        setError(
+          data.message ||
+          'Failed to start conversation'
+        );
+
+        return;
+      }
+
+
+      console.log(
+        'Conversation:',
+        data
+      );
+
+
+      navigate(
+        `/chat/${data._id}`
+      );
+
+    } catch (error) {
+
+      console.error(
+        'Conversation error:',
+        error
+      );
+
+
+      setError(
+        'Unable to start conversation.'
+      );
+
+    }
+
+  };
+
+
+  // -----------------------------
+  // UI
+  // -----------------------------
+
   return (
+
     <Box>
 
       {/* Back */}
+
       <Button
         startIcon={
           <ArrowBackIcon />
@@ -271,6 +465,7 @@ export default function ListingDetail() {
       >
         Back
       </Button>
+
 
       <Grid
         container
@@ -286,9 +481,13 @@ export default function ListingDetail() {
           xs={12}
           md={7}
         >
+
           {images.length > 0 ? (
+
             <>
+
               {/* Main Image */}
+
               <Box
                 component="img"
                 src={currentImage}
@@ -304,7 +503,9 @@ export default function ListingDetail() {
                 }}
               />
 
+
               {/* Counter */}
+
               <Typography
                 variant="body2"
                 color="text.secondary"
@@ -313,11 +514,14 @@ export default function ListingDetail() {
                   textAlign: 'right',
                 }}
               >
-                {selectedImage + 1} /{' '}
+                {selectedImage + 1}{' '}
+                /{' '}
                 {images.length}
               </Typography>
 
+
               {/* Thumbnails */}
+
               <Box
                 sx={{
                   display: 'flex',
@@ -327,8 +531,10 @@ export default function ListingDetail() {
                   pb: 1,
                 }}
               >
+
                 {images.map(
                   (image, index) => (
+
                     <Box
                       key={`${image}-${index}`}
                       component="img"
@@ -344,33 +550,37 @@ export default function ListingDetail() {
                       sx={{
                         width: 80,
                         height: 65,
-                        objectFit:
-                          'cover',
+                        objectFit: 'cover',
                         borderRadius: 2,
                         cursor: 'pointer',
                         flexShrink: 0,
+
                         border:
-                          selectedImage ===
-                          index
+                          selectedImage === index
                             ? '3px solid'
                             : '1px solid',
+
                         borderColor:
-                          selectedImage ===
-                          index
+                          selectedImage === index
                             ? 'primary.main'
                             : 'divider',
+
                         opacity:
-                          selectedImage ===
-                          index
+                          selectedImage === index
                             ? 1
                             : 0.75,
                       }}
                     />
+
                   )
                 )}
+
               </Box>
+
             </>
+
           ) : (
+
             <Box
               sx={{
                 height: 380,
@@ -382,12 +592,19 @@ export default function ListingDetail() {
                 justifyContent: 'center',
               }}
             >
-              <Typography color="text.secondary">
+
+              <Typography
+                color="text.secondary"
+              >
                 No image available
               </Typography>
+
             </Box>
+
           )}
+
         </Grid>
+
 
         {/* ========================= */}
         {/* LISTING INFORMATION */}
@@ -400,6 +617,7 @@ export default function ListingDetail() {
         >
 
           {/* Category */}
+
           <Chip
             label={
               listing.category ||
@@ -412,12 +630,16 @@ export default function ListingDetail() {
             }}
           />
 
+
           {/* Title */}
+
           <Typography variant="h4">
             {listing.title}
           </Typography>
 
+
           {/* Price */}
+
           <Typography
             variant="h4"
             sx={{
@@ -435,26 +657,30 @@ export default function ListingDetail() {
             )}
           </Typography>
 
+
           {/* Location */}
+
           <Box
             sx={{
               display: 'flex',
-              alignItems:
-                'center',
+              alignItems: 'center',
               gap: 0.5,
               mt: 1.5,
               color:
                 'text.secondary',
             }}
           >
+
             <RoomOutlinedIcon
               fontSize="small"
             />
+
 
             <Typography variant="body2">
               {listing.neighborhood ||
                 'Nearby'}
             </Typography>
+
 
             <Typography
               sx={{ mx: 1 }}
@@ -462,31 +688,42 @@ export default function ListingDetail() {
               ·
             </Typography>
 
+
             <Typography variant="body2">
               {listing.condition ||
                 'Good'}
             </Typography>
+
           </Box>
 
+
           {/* Distance */}
+
           {typeof listing.distance ===
             'number' && (
+
             <Typography
               variant="body2"
               color="text.secondary"
               sx={{ mt: 0.5 }}
             >
+
               {listing.distance === 0
                 ? 'At your location'
                 : `${listing.distance} km away`}
+
             </Typography>
+
           )}
+
 
           <Divider
             sx={{ my: 3 }}
           />
 
+
           {/* Description */}
+
           <Typography
             variant="subtitle2"
             color="text.secondary"
@@ -494,6 +731,7 @@ export default function ListingDetail() {
           >
             Description
           </Typography>
+
 
           <Typography
             variant="body2"
@@ -503,9 +741,11 @@ export default function ListingDetail() {
               'No description provided.'}
           </Typography>
 
+
           <Divider
             sx={{ my: 3 }}
           />
+
 
           {/* ========================= */}
           {/* SELLER */}
@@ -519,15 +759,16 @@ export default function ListingDetail() {
             Seller
           </Typography>
 
+
           <Box
             sx={{
               display: 'flex',
-              alignItems:
-                'center',
+              alignItems: 'center',
               gap: 1.5,
               mb: 3,
             }}
           >
+
             <Avatar
               sx={{
                 bgcolor:
@@ -537,33 +778,47 @@ export default function ListingDetail() {
               {sellerInitial}
             </Avatar>
 
+
             <Box>
-              <Typography fontWeight={600}>
+
+              <Typography
+                fontWeight={600}
+              >
                 {sellerName}
               </Typography>
 
+
               {sellerEmail && (
+
                 <Typography
                   variant="caption"
                   color="text.secondary"
                 >
                   {sellerEmail}
                 </Typography>
+
               )}
+
             </Box>
+
           </Box>
+
 
           {/* ========================= */}
           {/* OWNER ACTIONS */}
           {/* ========================= */}
 
           {isOwner ? (
+
             <Box
               sx={{
                 display: 'flex',
                 gap: 1.5,
               }}
             >
+
+              {/* Edit */}
+
               <Button
                 variant="outlined"
                 startIcon={
@@ -578,6 +833,9 @@ export default function ListingDetail() {
               >
                 Edit listing
               </Button>
+
+
+              {/* Delete */}
 
               <Button
                 variant="outlined"
@@ -595,8 +853,11 @@ export default function ListingDetail() {
                   ? 'Deleting...'
                   : 'Delete'}
               </Button>
+
             </Box>
+
           ) : (
+
             /* ========================= */
             /* BUYER ACTIONS */
             /* ========================= */
@@ -607,18 +868,24 @@ export default function ListingDetail() {
                 gap: 1.5,
               }}
             >
+
+              {/* Message Seller */}
+
               <Button
                 variant="outlined"
                 startIcon={
                   <ChatBubbleOutlineIcon />
                 }
                 fullWidth
-                onClick={() =>
-                  navigate('/chat/c1')
+                onClick={
+                  handleMessageSeller
                 }
               >
                 Message seller
               </Button>
+
+
+              {/* Buy Now */}
 
               <Button
                 variant="contained"
@@ -631,10 +898,14 @@ export default function ListingDetail() {
               >
                 Buy now
               </Button>
+
             </Box>
+
           )}
 
+
           {/* Payment information */}
+
           <Paper
             variant="outlined"
             sx={{
@@ -647,15 +918,23 @@ export default function ListingDetail() {
                 '#F2EFE6',
             }}
           >
-            <Typography variant="body2">
+
+            <Typography
+              variant="body2"
+            >
               Payment is held safely until
               you confirm the item was
               delivered as described.
             </Typography>
+
           </Paper>
 
         </Grid>
+
       </Grid>
+
     </Box>
+
   );
+
 }
