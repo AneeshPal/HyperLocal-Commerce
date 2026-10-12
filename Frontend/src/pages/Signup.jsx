@@ -18,22 +18,22 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
+  const handleSignup = async (event) => {
+    event.preventDefault();
 
     setError('');
+    setSubmitting(true);
 
     try {
       const response = await fetch(
         'http://localhost:8080/api/auth/signup',
         {
           method: 'POST',
-
           headers: {
             'Content-Type': 'application/json'
           },
-
           body: JSON.stringify({
             name,
             email,
@@ -50,13 +50,12 @@ export default function Signup() {
         return;
       }
 
-      console.log('Signup successful:', data);
-
       navigate('/login');
-
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error('Signup error:', err);
       setError('Unable to connect to server');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -68,7 +67,7 @@ export default function Signup() {
         alignItems: 'center',
         justifyContent: 'center',
         bgcolor: 'background.default',
-        px: 2,
+        px: 2
       }}
     >
       <Paper
@@ -76,6 +75,7 @@ export default function Signup() {
         sx={{
           p: 5,
           width: 400,
+          maxWidth: '100%',
           borderRadius: 3,
           borderColor: 'divider'
         }}
@@ -84,11 +84,7 @@ export default function Signup() {
           Join Aas-Paas
         </Typography>
 
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mb: 4 }}
-        >
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
           We use your location only to show listings near you.
         </Typography>
 
@@ -105,15 +101,18 @@ export default function Signup() {
             label="Full name"
             fullWidth
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(event) => setName(event.target.value)}
+            autoComplete="name"
             required
           />
 
           <TextField
-            label="Phone number or email"
+            label="Email"
+            type="email"
             fullWidth
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="email"
             required
           />
 
@@ -122,7 +121,8 @@ export default function Signup() {
             type="password"
             fullWidth
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="new-password"
             required
           />
 
@@ -131,7 +131,7 @@ export default function Signup() {
             placeholder="e.g. Kakadeo, Kanpur"
             fullWidth
             value={neighborhood}
-            onChange={(e) => setNeighborhood(e.target.value)}
+            onChange={(event) => setNeighborhood(event.target.value)}
           />
 
           {error && (
@@ -144,9 +144,10 @@ export default function Signup() {
             type="submit"
             variant="contained"
             size="large"
+            disabled={submitting}
             sx={{ py: 1.2 }}
           >
-            Create account
+            {submitting ? 'Creating account...' : 'Create account'}
           </Button>
         </Box>
 
@@ -156,14 +157,10 @@ export default function Signup() {
           color="text.secondary"
         >
           Already have an account?{' '}
-
           <MLink
             component={Link}
             to="/login"
-            sx={{
-              color: 'primary.dark',
-              fontWeight: 600
-            }}
+            sx={{ color: 'primary.dark', fontWeight: 600 }}
           >
             Log in
           </MLink>

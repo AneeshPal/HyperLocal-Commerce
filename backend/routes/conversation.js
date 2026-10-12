@@ -2,6 +2,7 @@ import express from "express";
 
 import Conversation from "../models/Conversation.js";
 import Listing from "../models/Listing.js";
+import Message from "../models/Message.js";
 
 import authMiddleware from "../middleware/auth.js";
 
@@ -179,6 +180,66 @@ router.post(
     }
 );
 
+// ========================================
+// DELETE A CONVERSATION AND ITS MESSAGES
+// ========================================
+
+router.delete(
+    "/:id",
+    authMiddleware,
+    async (req, res) => {
+        try {
+            const conversation =
+                await Conversation.findById(
+                    req.params.id
+                );
+
+            if (!conversation) {
+                return res.status(404).json({
+                    message: "Conversation not found"
+                });
+            }
+
+            const isParticipant =
+                conversation.participants.some(
+                    (participant) =>
+                        participant.toString() ===
+                        req.user
+                );
+
+            if (!isParticipant) {
+                return res.status(403).json({
+                    message:
+                        "You cannot delete this conversation"
+                });
+            }
+
+            // Delete messages belonging to this chat
+            await Message.deleteMany({
+                conversation: conversation._id
+            });
+
+            // Delete the conversation itself
+            await conversation.deleteOne();
+
+            return res.json({
+                message:
+                    "Conversation and messages deleted successfully"
+            });
+
+        } catch (error) {
+            console.error(
+                "Delete conversation error:",
+                error
+            );
+
+            return res.status(500).json({
+                message:
+                    "Failed to delete conversation"
+            });
+        }
+    }
+);
 
 // ========================================
 // GET ONE CONVERSATION

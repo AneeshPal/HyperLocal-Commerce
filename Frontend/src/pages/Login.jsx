@@ -16,22 +16,22 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async (event) => {
+    event.preventDefault();
 
     setError('');
+    setSubmitting(true);
 
     try {
       const response = await fetch(
         'http://localhost:8080/api/auth/login',
         {
           method: 'POST',
-
           headers: {
             'Content-Type': 'application/json'
           },
-
           body: JSON.stringify({
             email,
             password
@@ -46,15 +46,23 @@ export default function Login() {
         return;
       }
 
-      console.log('Login successful:', data);
+      if (!data.token || !data.user) {
+        setError('The server did not return the required login details.');
+        return;
+      }
 
       localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+
+      window.dispatchEvent(new Event('userUpdated'));
 
       navigate('/');
-
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error('Login error:', err);
       setError('Unable to connect to server');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -66,7 +74,7 @@ export default function Login() {
         alignItems: 'center',
         justifyContent: 'center',
         bgcolor: 'background.default',
-        px: 2,
+        px: 2
       }}
     >
       <Paper
@@ -74,6 +82,7 @@ export default function Login() {
         sx={{
           p: 5,
           width: 400,
+          maxWidth: '100%',
           borderRadius: 3,
           borderColor: 'divider'
         }}
@@ -82,11 +91,7 @@ export default function Login() {
           Aas-Paas
         </Typography>
 
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mb: 4 }}
-        >
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
           Buy and sell with people in your own neighborhood.
         </Typography>
 
@@ -100,10 +105,12 @@ export default function Login() {
           }}
         >
           <TextField
-            label="Phone number or email"
+            label="Email"
+            type="email"
             fullWidth
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="email"
             required
           />
 
@@ -112,7 +119,8 @@ export default function Login() {
             type="password"
             fullWidth
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
             required
           />
 
@@ -126,9 +134,10 @@ export default function Login() {
             type="submit"
             variant="contained"
             size="large"
+            disabled={submitting}
             sx={{ py: 1.2 }}
           >
-            Log in
+            {submitting ? 'Logging in...' : 'Log in'}
           </Button>
         </Box>
 
@@ -138,14 +147,10 @@ export default function Login() {
           color="text.secondary"
         >
           New here?{' '}
-
           <MLink
             component={Link}
             to="/signup"
-            sx={{
-              color: 'primary.dark',
-              fontWeight: 600
-            }}
+            sx={{ color: 'primary.dark', fontWeight: 600 }}
           >
             Create an account
           </MLink>

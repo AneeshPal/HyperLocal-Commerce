@@ -279,6 +279,24 @@ router.get("/", async (req, res) => {
     }
 });
 
+
+router.get("/mine", authMiddleware, async (req, res) => {
+    try {
+        const listings = await Listing.find({
+            seller: req.user
+        }).sort({ createdAt: -1 });
+
+        return res.json(listings);
+    } catch (error) {
+        console.error("My listings error:", error);
+
+        return res.status(500).json({
+            message: "Failed to fetch your listings"
+        });
+    }
+});
+
+
 router.get("/:id", async (req, res) => {
     try {
         const { id } = req.params;

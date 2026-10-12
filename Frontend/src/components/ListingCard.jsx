@@ -4,40 +4,40 @@ import {
   CardMedia,
   Box,
   Typography,
-  Chip,
+  Chip
 } from '@mui/material';
 
 import RoomOutlinedIcon from '@mui/icons-material/RoomOutlined';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function ListingCard({ listing }) {
   const navigate = useNavigate();
+  const [imageFailed, setImageFailed] = useState(false);
 
-  // Get first listing image
-  const image =
-    Array.isArray(listing.images) &&
-    listing.images.length > 0
-      ? listing.images[0]
-      : '';
+  const imageValue = Array.isArray(listing.images)
+    ? listing.images[0]
+    : '';
 
-  // Format date
+  const image = typeof imageValue === 'string'
+    ? imageValue
+    : imageValue?.url || imageValue?.secure_url || '';
+
+  const showImage = Boolean(image) && !imageFailed;
+
   const postedDate = listing.createdAt
     ? new Date(listing.createdAt).toLocaleDateString('en-IN')
     : '';
 
   const handleClick = () => {
-    console.log('Clicked listing ID:', listing._id);
+    const listingId = listing._id || listing.id;
 
-    // Prevent /listing/undefined
-    if (!listing._id) {
-      console.error(
-        'Listing _id is missing:',
-        listing
-      );
+    if (!listingId) {
+      console.error('Listing ID is missing:', listing);
       return;
     }
 
-    navigate(`/listing/${listing._id}`);
+    navigate(`/listing/${listingId}`);
   };
 
   return (
@@ -47,81 +47,57 @@ export default function ListingCard({ listing }) {
         borderColor: 'divider',
         borderRadius: 3,
         overflow: 'hidden',
+        height: '100%'
       }}
     >
-      <CardActionArea onClick={handleClick}>
-
-        {/* ========================= */}
-        {/* LISTING IMAGE */}
-        {/* ========================= */}
-
-        {image ? (
+      <CardActionArea onClick={handleClick} sx={{ height: '100%' }}>
+        {showImage ? (
           <CardMedia
             component="img"
             height="150"
             image={image}
-            alt={listing.title}
-            onError={(e) => {
-              e.currentTarget.style.display =
-                'none';
-            }}
+            alt={listing.title || 'Listing image'}
+            onError={() => setImageFailed(true)}
             sx={{
               objectFit: 'cover',
-              backgroundColor: '#f5f5f5',
+              backgroundColor: '#F1F5F9'
             }}
           />
         ) : (
           <Box
             sx={{
               height: 150,
-              backgroundColor: '#f5f5f5',
+              bgcolor: '#F1F5F9',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: 'center'
             }}
           >
-            <Typography
-              variant="body2"
-              color="text.secondary"
-            >
-              No image
+            <Typography variant="body2" color="text.secondary">
+              No image available
             </Typography>
           </Box>
         )}
 
-        {/* ========================= */}
-        {/* LISTING INFORMATION */}
-        {/* ========================= */}
-
         <Box sx={{ p: 1.75 }}>
-
-          {/* Title */}
           <Typography
             variant="subtitle1"
             fontWeight={600}
             noWrap
           >
-            {listing.title}
+            {listing.title || 'Untitled listing'}
           </Typography>
 
-          {/* Price */}
           <Typography
             variant="h6"
             sx={{
               color: 'primary.dark',
               fontFamily: 'inherit',
-              fontWeight: 700,
+              fontWeight: 700
             }}
           >
-            ₹
-            {Number(
-              listing.price
-            ).toLocaleString('en-IN')}
+            ₹{Number(listing.price || 0).toLocaleString('en-IN')}
           </Typography>
-
-          {/* ========================= */}
-          {/* DISTANCE */}
-          {/* ========================= */}
 
           <Box
             sx={{
@@ -129,45 +105,32 @@ export default function ListingCard({ listing }) {
               alignItems: 'center',
               gap: 0.5,
               mt: 0.5,
-              color: 'text.secondary',
+              color: 'text.secondary'
             }}
           >
-            <RoomOutlinedIcon
-              sx={{ fontSize: 16 }}
-            />
+            <RoomOutlinedIcon sx={{ fontSize: 16 }} />
 
             <Typography variant="caption">
-              {typeof listing.distance ===
-                'number'
+              {typeof listing.distance === 'number'
                 ? listing.distance === 0
                   ? 'At your location'
                   : `${listing.distance} km away`
-                : listing.neighborhood ||
-                  'Distance unavailable'}
+                : listing.neighborhood || 'Distance unavailable'}
             </Typography>
           </Box>
-
-          {/* ========================= */}
-          {/* CONDITION + DATE */}
-          {/* ========================= */}
 
           <Box
             sx={{
               display: 'flex',
               gap: 0.75,
               mt: 1,
-              flexWrap: 'wrap',
+              flexWrap: 'wrap'
             }}
           >
             <Chip
-              label={
-                listing.condition ||
-                'Good'
-              }
+              label={listing.condition || 'Good'}
               size="small"
-              sx={{
-                bgcolor: '#F2EFE6',
-              }}
+              sx={{ bgcolor: '#E0F2FE' }}
             />
 
             {postedDate && (
@@ -175,13 +138,10 @@ export default function ListingCard({ listing }) {
                 label={postedDate}
                 size="small"
                 variant="outlined"
-                sx={{
-                  borderColor: 'divider',
-                }}
+                sx={{ borderColor: 'divider' }}
               />
             )}
           </Box>
-
         </Box>
       </CardActionArea>
     </Card>

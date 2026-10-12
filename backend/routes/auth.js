@@ -1,25 +1,30 @@
 import express from "express";
 import bcrypt from "bcryptjs";
-import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import User from "../models/User.js";
+import authMiddleware from "../middleware/auth.js";
+
 dotenv.config();
-
-
 
 const router = express.Router();
 
+// SIGN UP
 router.post("/signup", async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, neighborhood } = req.body;
 
         if (!name || !email || !password) {
             return res.status(400).json({
-                message: "All fields are required"
+                message: "Name, email, and password are required"
             });
         }
 
-        const existingUser = await User.findOne({ email });
+        const normalizedEmail = email.trim().toLowerCase();
+
+        const existingUser = await User.findOne({
+            email: normalizedEmail
+        });
 
         if (existingUser) {
             return res.status(400).json({
@@ -28,28 +33,33 @@ router.post("/signup", async (req, res) => {
         }
 
         const user = new User({
-            name,
-            email,
-            password
+            name: name.trim(),
+            email: normalizedEmail,
+            password,
+            neighborhood: neighborhood?.trim() || ""
         });
 
         await user.save();
 
-        res.status(201).json({
+        return res.status(201).json({
             message: "User registered successfully"
         });
-
     } catch (error) {
-        console.error("Signup Error:", error);
+        console.error("Signup error:", error);
 
-        res.status(500).json({
-            message: "Server error",
-            error: error.message
+        if (error.code === 11000) {
+            return res.status(400).json({
+                message: "User already exists"
+            });
+        }
+
+        return res.status(500).json({
+            message: "Server error"
         });
     }
 });
 
-
+// LOG IN
 router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -60,7 +70,11 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email });
+        const normalizedEmail = email.trim().toLowerCase();
+
+        const user = await User.findOne({
+            email: normalizedEmail
+        });
 
         if (!user) {
             return res.status(401).json({
@@ -85,19 +99,46 @@ router.post("/login", async (req, res) => {
             { expiresIn: "7d" }
         );
 
-        res.status(200).json({
+        return res.status(200).json({
             message: "Login successful",
-            token
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                neighborhood: user.neighborhood || "",
+                createdAt: user.createdAt
+            }
         });
-
     } catch (error) {
-        console.log(error.message);
+        console.error("Login error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             message: "Server error"
         });
     }
 });
 
+// GET LOGGED-IN USER PROFILE
+router.get("/me", authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.user)
+            .select("-password");
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        return res.json({ user });
+    } catch (error) {
+        console.error("Get profile error:", error);
+
+        return res.status(500).json({
+            message: "Failed to fetch profile"
+        });
+    }
+});
 
 export default router;

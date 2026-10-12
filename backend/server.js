@@ -13,6 +13,7 @@ import authRoutes from "./routes/auth.js";
 import listingRoutes from "./routes/listing.js";
 import conversationRoutes from "./routes/conversation.js";
 import messageRoutes from "./routes/message.js";
+import transactionRoutes from "./routes/transactions.js";
 
 import authMiddleware from "./middleware/auth.js";
 
@@ -29,6 +30,7 @@ const PORT = 8080;
 app.use(cors());
 
 app.use(express.json());
+
 
 
 // ===============================
@@ -55,7 +57,7 @@ app.use(
     messageRoutes
 );
 
-
+app.use("/api/transactions", transactionRoutes);
 // ===============================
 // PROTECTED TEST ROUTE
 // ===============================
