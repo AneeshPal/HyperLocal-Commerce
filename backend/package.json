@@ -23,6 +23,7 @@
     "mongoose": "^9.10.0",
     "multer": "^2.4.0",
     "nodemon": "^3.1.14",
+    "razorpay": "^2.9.8",
     "socket.io": "^4.8.4"
   }
 }
