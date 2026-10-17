@@ -1,101 +1,404 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
 import {
+  Alert,
   Box,
-  Typography,
-  Paper,
-  Divider,
   Button,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-} from '@mui/material';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { listings } from '../data/mockData';
+  CircularProgress,
+  Container,
+  Divider,
+  Paper,
+  Typography,
+} from "@mui/material";
 
-export default function Checkout() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const listing = listings.find((l) => l.id === id) || listings[0];
-  const [placed, setPlaced] = useState(false);
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
-  const platformFee = Math.round(listing.price * 0.02);
-  const total = listing.price + platformFee;
+function getToken() {
+  return localStorage.getItem("token");
+}
 
-  if (placed) {
-    return (
-      <Box sx={{ maxWidth: 480, textAlign: 'center', py: 8 }}>
-        <Typography variant="h4" sx={{ mb: 1 }}>
-          Payment secured
-        </Typography>
-        <Typography color="text.secondary" sx={{ mb: 4 }}>
-          &#8377;{total.toLocaleString('en-IN')} is held in escrow. It will be released to {listing.seller} once you
-          confirm the item was delivered as described.
-        </Typography>
-        <Button variant="contained" onClick={() => navigate('/orders')}>
-          View my orders
-        </Button>
-      </Box>
+async function readResponse(response) {
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.message || `Request failed (${response.status}).`
     );
   }
 
+  return data;
+}
+
+// Load Razorpay Checkout only when the buyer starts checkout.
+function loadRazorpayScript() {
+  return new Promise((resolve, reject) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+
+    const existingScript = document.querySelector(
+      'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(true), {
+        once: true,
+      });
+      existingScript.addEventListener(
+        "error",
+        () => reject(new Error("Could not load Razorpay Checkout.")),
+        { once: true }
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+
+    script.onload = () => resolve(true);
+    script.onerror = () =>
+      reject(new Error("Could not load Razorpay Checkout."));
+
+    document.body.appendChild(script);
+  });
+}
+
+export default function Checkout() {
+  const { id: listingId } = useParams();
+  const navigate = useNavigate();
+
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchListing() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/listings/${listingId}`
+        );
+
+        const data = await readResponse(response);
+
+        if (!cancelled) {
+          setListing(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || "Could not load listing.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (!listingId) {
+      setError("Listing ID is missing.");
+      setLoading(false);
+    } else {
+      fetchListing();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [listingId]);
+
+  async function handlePayment() {
+    if (paying) return;
+
+    setError("");
+    setSuccess("");
+
+    const token = getToken();
+
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    if (!listing) {
+      setError("Listing details are not available.");
+      return;
+    }
+
+    try {
+      setPaying(true);
+
+      // 1. Load the Razorpay Checkout script.
+      await loadRazorpayScript();
+
+      // 2. Create a transaction on our backend.
+      const transactionResponse = await fetch(
+        `${API_BASE_URL}/api/transactions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ listingId }),
+        }
+      );
+
+      const transactionData = await readResponse(
+        transactionResponse
+      );
+
+      const transaction = transactionData.transaction;
+
+      if (!transaction?.id) {
+        throw new Error(
+          "The server did not return a transaction ID."
+        );
+      }
+
+      // 3. Create or retrieve the Razorpay order.
+      const orderResponse = await fetch(
+        `${API_BASE_URL}/api/payments/${transaction.id}/order`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const orderData = await readResponse(orderResponse);
+      const order = orderData.order;
+      const keyId = orderData.keyId;
+
+      if (
+        !keyId ||
+        !order?.orderId ||
+        !Number.isSafeInteger(order.amountPaise) ||
+        !order.currency
+      ) {
+        throw new Error(
+          "The server returned incomplete payment-order details."
+        );
+      }
+
+      // 4. Open Razorpay Checkout.
+      const options = {
+        key: keyId,
+        amount: order.amountPaise,
+        currency: order.currency,
+        name: "Aas-Paas",
+        description: listing.title
+          ? `Purchase: ${listing.title}`
+          : "Marketplace purchase",
+        order_id: order.orderId,
+
+        handler: async function (paymentResponse) {
+          try {
+            setError("");
+            setSuccess("");
+
+            // 5. Ask our backend to verify the payment.
+            const verifyResponse = await fetch(
+              `${API_BASE_URL}/api/payments/${transaction.id}/verify`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  razorpay_order_id:
+                    paymentResponse.razorpay_order_id,
+                  razorpay_payment_id:
+                    paymentResponse.razorpay_payment_id,
+                  razorpay_signature:
+                    paymentResponse.razorpay_signature,
+                }),
+              }
+            );
+
+            const verificationData = await readResponse(
+              verifyResponse
+            );
+
+            if (
+              verificationData.paymentStatus !== "paid"
+            ) {
+              throw new Error(
+                "Payment has not been confirmed by the server."
+              );
+            }
+
+            setSuccess(
+              "Payment verified successfully!"
+            );
+          } catch (err) {
+            setError(
+              err.message ||
+                "We could not confirm your payment. Check your transaction status before trying again."
+            );
+          } finally {
+            setPaying(false);
+          }
+        },
+
+        modal: {
+          ondismiss: function () {
+            setPaying(false);
+          },
+        },
+
+        theme: {
+          color: "#1976d2",
+        },
+      };
+
+      const checkout = new window.Razorpay(options);
+
+      checkout.on("payment.failed", function (response) {
+        setError(
+          response.error?.description ||
+            "Payment failed. Please check the transaction status before retrying."
+        );
+        setPaying(false);
+      });
+
+      checkout.open();
+    } catch (err) {
+      setError(err.message || "Could not start checkout.");
+      setPaying(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 8, textAlign: "center" }}>
+        <CircularProgress />
+        <Typography sx={{ mt: 2 }}>
+          Loading checkout...
+        </Typography>
+      </Container>
+    );
+  }
+
+  if (error && !listing) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 4 }}>
+        <Alert severity="error">{error}</Alert>
+        <Button sx={{ mt: 2 }} onClick={() => navigate(-1)}>
+          Go back
+        </Button>
+      </Container>
+    );
+  }
+
+  if (!listing) return null;
+
   return (
-    <Box sx={{ maxWidth: 520 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>
+    <Container maxWidth="sm" sx={{ py: 5 }}>
+      <Typography variant="h4" fontWeight={700} gutterBottom>
         Checkout
       </Typography>
 
-      <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, borderColor: 'divider', mb: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-          <Box component="img" src={listing.image} alt={listing.title} sx={{ width: 72, height: 72, borderRadius: 2, objectFit: 'cover' }} />
-          <Box>
-            <Typography fontWeight={600}>{listing.title}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Sold by {listing.seller}
-            </Typography>
-          </Box>
-        </Box>
-        <Divider sx={{ mb: 2 }} />
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            Item price
-          </Typography>
-          <Typography variant="body2">&#8377;{listing.price.toLocaleString('en-IN')}</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            Platform escrow fee (2%)
-          </Typography>
-          <Typography variant="body2">&#8377;{platformFee.toLocaleString('en-IN')}</Typography>
-        </Box>
-        <Divider sx={{ my: 1.5 }} />
-        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Typography fontWeight={700}>Total</Typography>
-          <Typography fontWeight={700}>&#8377;{total.toLocaleString('en-IN')}</Typography>
-        </Box>
-      </Paper>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        Review your order before proceeding to payment.
+      </Typography>
 
-      <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, borderColor: 'divider', mb: 3 }}>
-        <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-          Pay with
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h6" fontWeight={600}>
+          {listing.title || "Marketplace listing"}
         </Typography>
-        <RadioGroup defaultValue="upi">
-          <FormControlLabel value="upi" control={<Radio />} label="UPI" />
-          <FormControlLabel value="card" control={<Radio />} label="Credit / Debit card" />
-          <FormControlLabel value="netbanking" control={<Radio />} label="Net banking" />
-        </RadioGroup>
+
+        {listing.description && (
+          <Typography
+            color="text.secondary"
+            sx={{ mt: 1, mb: 2 }}
+          >
+            {listing.description}
+          </Typography>
+        )}
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 2,
+            mb: 2,
+          }}
+        >
+          <Typography>Listing price</Typography>
+          <Typography fontWeight={700}>
+            {new Intl.NumberFormat("en-IN", {
+              style: "currency",
+              currency: "INR",
+              maximumFractionDigits: 2,
+            }).format(Number(listing.price))}
+          </Typography>
+        </Box>
+
+        <Alert severity="info" sx={{ mb: 2 }}>
+          The final payable amount is determined by the transaction
+          stored on the server.
+        </Alert>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {success}
+          </Alert>
+        )}
+
+        <Button
+          fullWidth
+          size="large"
+          variant="contained"
+          onClick={handlePayment}
+          disabled={paying || Boolean(success)}
+        >
+          {paying ? (
+            <>
+              <CircularProgress
+                size={20}
+                color="inherit"
+                sx={{ mr: 1 }}
+              />
+              Processing...
+            </>
+          ) : success ? (
+            "Payment verified"
+          ) : (
+            "Proceed to payment"
+          )}
+        </Button>
+
+        <Button
+          fullWidth
+          sx={{ mt: 1 }}
+          onClick={() => navigate(`/listing/${listingId}`)}
+          disabled={paying}
+        >
+          Back to listing
+        </Button>
       </Paper>
-
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary', mb: 2 }}>
-        <LockOutlinedIcon fontSize="small" />
-        <Typography variant="caption">
-          Funds stay in escrow until you confirm delivery. Powered by Razorpay.
-        </Typography>
-      </Box>
-
-      <Button variant="contained" size="large" fullWidth sx={{ py: 1.3 }} onClick={() => setPlaced(true)}>
-        Pay &#8377;{total.toLocaleString('en-IN')} securely
-      </Button>
-    </Box>
+    </Container>
   );
 }
