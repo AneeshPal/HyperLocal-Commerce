@@ -11,6 +11,11 @@ import {
   Chip,
   CircularProgress,
   Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from '@mui/material';
 
 const API_BASE_URL =
@@ -18,8 +23,8 @@ const API_BASE_URL =
 
 const STATUS_STEPS = [
   'Paid',
-  'Receipt confirmed',
   'Delivered',
+  'Receipt confirmed',
   'Settlement',
 ];
 
@@ -48,13 +53,13 @@ function getStatus(transaction) {
   if (transaction.resolutionStatus === 'release_eligible') {
     return {
       label: 'Receipt confirmed',
-      step: 1,
+      step: 2,
       color: 'success',
     };
   }
 
   if (transaction.fulfilmentStatus === 'delivered') {
-    return { label: 'Delivered', step: 2, color: 'info' };
+    return { label: 'Delivered', step: 1, color: 'info' };
   }
 
   if (transaction.fulfilmentStatus === 'in_progress') {
@@ -84,9 +89,27 @@ export default function Orders() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [busyId, setBusyId] = useState('');
+  const [disputeTransaction, setDisputeTransaction] = useState(null);
+  const [disputeReason, setDisputeReason] = useState('');
 
-  async function loadTransactions() {
-    setLoading(true);
+  const [currentUserId, setCurrentUserId] = useState(() => {
+    try {
+      const user = JSON.parse(
+        localStorage.getItem('user') ||
+          localStorage.getItem('currentUser') ||
+          'null'
+      );
+      return getId(user);
+    } catch {
+      return '';
+    }
+  });
+
+  async function loadTransactions(showSpinner = true) {
+    if (showSpinner) setLoading(true);
     setError('');
 
     try {
@@ -118,10 +141,21 @@ export default function Orders() {
       }
 
       setTransactions(data);
+
+      try {
+        const user = JSON.parse(
+          localStorage.getItem('user') ||
+            localStorage.getItem('currentUser') ||
+            'null'
+        );
+        setCurrentUserId(getId(user));
+      } catch {
+        setCurrentUserId('');
+      }
     } catch (err) {
       setError(err.message || 'Unable to load your orders.');
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   }
 
@@ -129,19 +163,72 @@ export default function Orders() {
     loadTransactions();
   }, []);
 
-  const storedUser = (() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem('user') ||
-        localStorage.getItem('currentUser') ||
-        'null'
-      );
-    } catch {
-      return null;
-    }
-  })();
+  async function performAction(transaction, endpoint, successMessage, body) {
+    const id = getId(transaction);
 
-  const currentUserId = getId(storedUser);
+    setBusyId(id);
+    setActionError('');
+    setNotice('');
+
+    try {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        throw new Error('Your session has expired. Please log in again.');
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/transactions/${encodeURIComponent(id)}/${endpoint}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(body ? { 'Content-Type': 'application/json' } : {}),
+          },
+          ...(body ? { body: JSON.stringify(body) } : {}),
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || 'The action failed. Please try again.'
+        );
+      }
+
+      setNotice(successMessage);
+      setDisputeTransaction(null);
+      setDisputeReason('');
+
+      await loadTransactions(false);
+    } catch (err) {
+      setActionError(err.message || 'Unable to complete the action.');
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  function submitDispute() {
+    const reason = disputeReason.trim();
+
+    if (!reason) {
+      setActionError('Please enter a reason for the dispute.');
+      return;
+    }
+
+    if (reason.length > 1000) {
+      setActionError('The reason must be 1000 characters or fewer.');
+      return;
+    }
+
+    performAction(
+      disputeTransaction,
+      'dispute',
+      'Your dispute has been submitted.',
+      { reason }
+    );
+  }
 
   if (loading) {
     return (
@@ -172,13 +259,33 @@ export default function Orders() {
             <Button
               color="inherit"
               size="small"
-              onClick={loadTransactions}
+              onClick={() => loadTransactions()}
             >
               Retry
             </Button>
           }
         >
           {error}
+        </Alert>
+      )}
+
+      {notice && (
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setNotice('')}
+        >
+          {notice}
+        </Alert>
+      )}
+
+      {actionError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setActionError('')}
+        >
+          {actionError}
         </Alert>
       )}
 
@@ -204,14 +311,13 @@ export default function Orders() {
 
           const buyerId = getId(transaction.buyer);
           const sellerId = getId(transaction.seller);
+          const id = getId(transaction);
 
           const isBuyer =
-            Boolean(currentUserId) &&
-            buyerId === currentUserId;
+            Boolean(currentUserId) && buyerId === currentUserId;
 
           const isSeller =
-            Boolean(currentUserId) &&
-            sellerId === currentUserId;
+            Boolean(currentUserId) && sellerId === currentUserId;
 
           const role = isBuyer
             ? 'Purchase'
@@ -221,10 +327,37 @@ export default function Orders() {
 
           const status = getStatus(transaction);
           const amount = Number(transaction.amountPaise) / 100;
+          const paid = transaction.paymentStatus === 'paid';
+          const delivered =
+            transaction.fulfilmentStatus === 'delivered';
+          const cancelled =
+            transaction.fulfilmentStatus === 'cancelled';
+          const resolution =
+            transaction.resolutionStatus || 'none';
+          const busy = busyId === id;
+
+          const canMarkDelivered =
+            isSeller &&
+            paid &&
+            !delivered &&
+            !cancelled &&
+            resolution === 'none';
+
+          const canConfirmReceipt =
+            isBuyer &&
+            paid &&
+            delivered &&
+            resolution === 'none';
+
+          const canDispute =
+            isBuyer &&
+            paid &&
+            !cancelled &&
+            ['none', 'release_eligible'].includes(resolution);
 
           return (
             <Paper
-              key={transaction._id}
+              key={id}
               variant="outlined"
               sx={{
                 p: { xs: 2, sm: 3 },
@@ -258,7 +391,7 @@ export default function Orders() {
                     color="text.secondary"
                     sx={{ mt: 0.5, overflowWrap: 'anywhere' }}
                   >
-                    Transaction: {transaction._id}
+                    Transaction: {id}
                   </Typography>
 
                   <Typography variant="body2" color="text.secondary">
@@ -293,30 +426,159 @@ export default function Orders() {
                 Payment: {transaction.paymentStatus || 'Unknown'}
                 {' · '}
                 Delivery: {transaction.fulfilmentStatus || 'Unknown'}
+                {' · '}
+                Resolution: {resolution.replaceAll('_', ' ')}
               </Typography>
 
-              {transaction.paymentStatus === 'paid' &&
-                status.step >= 0 && (
-                  <Stepper
-                    activeStep={status.step}
-                    alternativeLabel
-                    sx={{
-                      '& .MuiStepLabel-label': {
-                        fontSize: { xs: '0.65rem', sm: '0.75rem' },
-                      },
+              {paid && status.step >= 0 && (
+                <Stepper
+                  activeStep={status.step}
+                  alternativeLabel
+                  sx={{
+                    mb: 2,
+                    '& .MuiStepLabel-label': {
+                      fontSize: { xs: '0.65rem', sm: '0.75rem' },
+                    },
+                  }}
+                >
+                  {STATUS_STEPS.map((label) => (
+                    <Step key={label}>
+                      <StepLabel>{label}</StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
+              )}
+
+              {cancelled && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  This transaction has been cancelled.
+                </Alert>
+              )}
+
+              {resolution === 'disputed' && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  This transaction is disputed. Further actions are
+                  disabled until it is reviewed.
+                </Alert>
+              )}
+
+              {resolution === 'release_eligible' && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Receipt confirmed. The transaction is eligible for
+                  settlement, but settlement is not performed by this button.
+                </Alert>
+              )}
+
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {canMarkDelivered && (
+                  <Button
+                    variant="contained"
+                    disabled={busy}
+                    onClick={() =>
+                      performAction(
+                        transaction,
+                        'delivered',
+                        'Order marked as delivered.'
+                      )
+                    }
+                  >
+                    {busy ? 'Updating...' : 'Mark as Delivered'}
+                  </Button>
+                )}
+
+                {canConfirmReceipt && (
+                  <Button
+                    variant="contained"
+                    color="success"
+                    disabled={busy}
+                    onClick={() =>
+                      performAction(
+                        transaction,
+                        'confirm-receipt',
+                        'Receipt confirmed successfully.'
+                      )
+                    }
+                  >
+                    {busy ? 'Updating...' : 'Confirm Receipt'}
+                  </Button>
+                )}
+
+                {canDispute && (
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    disabled={busy}
+                    onClick={() => {
+                      setDisputeTransaction(transaction);
+                      setDisputeReason('');
+                      setActionError('');
                     }}
                   >
-                    {STATUS_STEPS.map((label) => (
-                      <Step key={label}>
-                        <StepLabel>{label}</StepLabel>
-                      </Step>
-                    ))}
-                  </Stepper>
+                    Raise a Dispute
+                  </Button>
                 )}
+              </Box>
             </Paper>
           );
         })}
       </Box>
+
+      <Dialog
+        open={Boolean(disputeTransaction)}
+        onClose={() => {
+          if (!busyId) {
+            setDisputeTransaction(null);
+            setDisputeReason('');
+          }
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Raise a dispute</DialogTitle>
+
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Explain the issue with this order. Submitting this will mark
+            the transaction as disputed.
+          </Typography>
+
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            maxRows={6}
+            label="Reason for dispute"
+            placeholder="For example, the item was not received..."
+            value={disputeReason}
+            onChange={(event) => setDisputeReason(event.target.value)}
+            inputProps={{ maxLength: 1000 }}
+            helperText={`${disputeReason.length}/1000 characters`}
+            disabled={Boolean(busyId)}
+          />
+        </DialogContent>
+
+        <DialogActions>
+          <Button
+            disabled={Boolean(busyId)}
+            onClick={() => {
+              setDisputeTransaction(null);
+              setDisputeReason('');
+            }}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            color="error"
+            variant="contained"
+            disabled={Boolean(busyId) || !disputeReason.trim()}
+            onClick={submitDispute}
+          >
+            {busyId ? 'Submitting...' : 'Submit Dispute'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
