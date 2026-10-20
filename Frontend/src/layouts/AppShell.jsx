@@ -32,8 +32,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import RoomOutlinedIcon from '@mui/icons-material/RoomOutlined';
 
-import { notifications } from '../data/mockData';
-
 const DRAWER_WIDTH = 232;
 
 const BLUE = '#0284C7';
@@ -41,35 +39,21 @@ const DARK_BLUE = '#0369A1';
 const LIGHT_BLUE = '#E0F2FE';
 const PAGE_BG = '#F8FAFC';
 
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+
 const navItems = [
-  {
-    label: 'Nearby',
-    icon: <StorefrontOutlinedIcon />,
-    path: '/',
-  },
+  { label: 'Nearby', icon: <StorefrontOutlinedIcon />, path: '/' },
   {
     label: 'Sell something',
     icon: <AddCircleOutlineIcon />,
     path: '/create-listing',
   },
-  {
-    label: 'Messages',
-    icon: <ChatBubbleOutlineIcon />,
-    path: '/chat',
-  },
-  {
-    label: 'Orders',
-    icon: <ReceiptLongOutlinedIcon />,
-    path: '/orders',
-  },
-  {
-    label: 'Profile',
-    icon: <PersonOutlineIcon />,
-    path: '/profile',
-  },
+  { label: 'Messages', icon: <ChatBubbleOutlineIcon />, path: '/chat' },
+  { label: 'Orders', icon: <ReceiptLongOutlinedIcon />, path: '/orders' },
+  { label: 'Profile', icon: <PersonOutlineIcon />, path: '/profile' },
 ];
 
-// Read saved account details without assuming every field exists.
 function getLoggedInUser() {
   let savedUser = {};
 
@@ -96,32 +80,20 @@ function getLoggedInUser() {
     const token = localStorage.getItem('token');
 
     if (token) {
-      const payload = JSON.parse(
-        atob(token.split('.')[1])
-      );
-
+      const payload = JSON.parse(atob(token.split('.')[1]));
       tokenUser = payload.user || payload;
     }
   } catch {
-    // The account can still be read from saved user data.
+    // Account details may still be available in saved user data.
   }
 
   return {
     ...tokenUser,
     ...savedUser,
-    name:
-      savedUser.name ||
-      tokenUser.name ||
-      tokenUser.fullName ||
-      '',
-    email:
-      savedUser.email ||
-      tokenUser.email ||
-      '',
+    name: savedUser.name || tokenUser.name || tokenUser.fullName || '',
+    email: savedUser.email || tokenUser.email || '',
     neighborhood:
-      savedUser.neighborhood ||
-      tokenUser.neighborhood ||
-      '',
+      savedUser.neighborhood || tokenUser.neighborhood || '',
     avatar:
       savedUser.avatar ||
       savedUser.profileImage ||
@@ -136,21 +108,81 @@ export default function AppShell() {
 
   const [search, setSearch] = useState('');
   const [user, setUser] = useState(getLoggedInUser);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const unreadCount = notifications.filter(
-    (notification) => !notification.read
-  ).length;
-
-  // Refresh account details after navigation, including login.
   useEffect(() => {
     setUser(getLoggedInUser());
   }, [location.pathname]);
 
-  // Update if another browser tab changes the saved account.
   useEffect(() => {
-    const refreshUser = () => {
-      setUser(getLoggedInUser());
+    let active = true;
+
+    const fetchUnreadCount = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        if (active) setUnreadCount(0);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/notifications/unread-count`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        if (active) {
+          setUnreadCount(Math.max(0, Number(data.count) || 0));
+        }
+      } catch (error) {
+        console.error('Failed to fetch unread notifications:', error);
+      }
     };
+
+    fetchUnreadCount();
+
+    // Refresh periodically so new notifications appear in the badge.
+    const intervalId = window.setInterval(fetchUnreadCount, 30000);
+
+    // Refresh immediately when returning to this tab.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUnreadCount();
+      }
+    };
+
+    // Allow other components to request an immediate refresh.
+    const handleNotificationsUpdated = () => {
+      fetchUnreadCount();
+    };
+
+    window.addEventListener('notificationsUpdated', handleNotificationsUpdated);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener(
+        'notificationsUpdated',
+        handleNotificationsUpdated
+      );
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+      );
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const refreshUser = () => setUser(getLoggedInUser());
 
     window.addEventListener('storage', refreshUser);
     window.addEventListener('userUpdated', refreshUser);
@@ -171,14 +203,7 @@ export default function AppShell() {
     .toUpperCase();
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        minHeight: '100vh',
-        bgcolor: PAGE_BG,
-      }}
-    >
-      {/* Sidebar */}
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: PAGE_BG }}>
       <Drawer
         variant="permanent"
         sx={{
@@ -194,28 +219,18 @@ export default function AppShell() {
           },
         }}
       >
-        {/* Brand */}
         <Box sx={{ px: 3, py: 3 }}>
           <Typography
             variant="h5"
-            sx={{
-              color: BLUE,
-              fontWeight: 800,
-              letterSpacing: '-0.02em',
-            }}
+            sx={{ color: BLUE, fontWeight: 800, letterSpacing: '-0.02em' }}
           >
             Aas-Paas
           </Typography>
-
-          <Typography
-            variant="caption"
-            sx={{ color: '#64748B' }}
-          >
+          <Typography variant="caption" sx={{ color: '#64748B' }}>
             buy & sell nearby
           </Typography>
         </Box>
 
-        {/* Navigation */}
         <List sx={{ px: 1.5, pt: 0 }}>
           {navItems.map((item) => {
             const selected =
@@ -238,22 +253,15 @@ export default function AppShell() {
                   '&.Mui-selected': {
                     bgcolor: LIGHT_BLUE,
                     color: DARK_BLUE,
-                    '& .MuiListItemIcon-root': {
-                      color: DARK_BLUE,
-                    },
-                    '&:hover': {
-                      bgcolor: '#BAE6FD',
-                    },
+                    '& .MuiListItemIcon-root': { color: DARK_BLUE },
+                    '&:hover': { bgcolor: '#BAE6FD' },
                   },
-                  '&:hover': {
-                    bgcolor: '#F0F9FF',
-                  },
+                  '&:hover': { bgcolor: '#F0F9FF' },
                 }}
               >
                 <ListItemIcon sx={{ minWidth: 40 }}>
                   {item.icon}
                 </ListItemIcon>
-
                 <ListItemText
                   primary={item.label}
                   primaryTypographyProps={{
@@ -266,16 +274,13 @@ export default function AppShell() {
           })}
         </List>
 
-        {/* Logged-in user at bottom-left */}
         <Box sx={{ mt: 'auto', p: 2 }}>
           <Box
             role="button"
             tabIndex={0}
             onClick={() => navigate('/profile')}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                navigate('/profile');
-              }
+              if (event.key === 'Enter') navigate('/profile');
             }}
             sx={{
               display: 'flex',
@@ -286,9 +291,7 @@ export default function AppShell() {
               bgcolor: LIGHT_BLUE,
               cursor: 'pointer',
               minWidth: 0,
-              '&:hover': {
-                bgcolor: '#BAE6FD',
-              },
+              '&:hover': { bgcolor: '#BAE6FD' },
             }}
           >
             <Avatar
@@ -304,7 +307,6 @@ export default function AppShell() {
             >
               {!user.avatar && initials}
             </Avatar>
-
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
                 variant="body2"
@@ -314,7 +316,6 @@ export default function AppShell() {
               >
                 {displayName}
               </Typography>
-
               <Typography
                 variant="caption"
                 noWrap
@@ -327,7 +328,6 @@ export default function AppShell() {
         </Box>
       </Drawer>
 
-      {/* Main content */}
       <Box
         sx={{
           flexGrow: 1,
@@ -357,7 +357,6 @@ export default function AppShell() {
               }}
             />
 
-            {/* Search */}
             <Box
               sx={{
                 flexGrow: 1,
@@ -369,16 +368,10 @@ export default function AppShell() {
                 px: 1.5,
                 py: 0.5,
                 maxWidth: 420,
-                '&:focus-within': {
-                  borderColor: BLUE,
-                },
+                '&:focus-within': { borderColor: BLUE },
               }}
             >
-              <SearchIcon
-                sx={{ color: BLUE, mr: 1 }}
-                fontSize="small"
-              />
-
+              <SearchIcon sx={{ color: BLUE, mr: 1 }} fontSize="small" />
               <InputBase
                 placeholder="Search nearby listings"
                 value={search}
@@ -391,14 +384,16 @@ export default function AppShell() {
             <Box sx={{ flexGrow: 1 }} />
 
             <IconButton
-              aria-label="Notifications"
+              aria-label={`Notifications, ${unreadCount} unread`}
               onClick={() => navigate('/notifications')}
-              sx={{
-                color: BLUE,
-                '&:hover': { bgcolor: LIGHT_BLUE },
-              }}
+              sx={{ color: BLUE, '&:hover': { bgcolor: LIGHT_BLUE } }}
             >
-              <Badge badgeContent={unreadCount} color="primary">
+              <Badge
+                badgeContent={unreadCount}
+                color="primary"
+                invisible={unreadCount === 0}
+                max={99}
+              >
                 <NotificationsNoneIcon />
               </Badge>
             </IconButton>
@@ -412,12 +407,7 @@ export default function AppShell() {
             bgcolor: PAGE_BG,
           }}
         >
-          <Outlet
-            context={{
-              search,
-              setSearch,
-            }}
-          />
+          <Outlet context={{ search, setSearch }} />
         </Box>
       </Box>
     </Box>

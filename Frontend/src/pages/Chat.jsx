@@ -1,10 +1,6 @@
 
 import { useEffect, useState } from 'react';
-
-import {
-  useParams,
-  useNavigate,
-} from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 
 import {
   Box,
@@ -19,6 +15,8 @@ import {
   IconButton,
   Divider,
   Tooltip,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 
 import SendIcon from '@mui/icons-material/Send';
@@ -26,6 +24,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 import socket from '../socket';
 
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 export default function Chat() {
   const { id } = useParams();
@@ -38,6 +38,7 @@ export default function Chat() {
   const [conversation, setConversation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [messageNotice, setMessageNotice] = useState('');
 
   const token = localStorage.getItem('token');
 
@@ -45,21 +46,14 @@ export default function Chat() {
 
   if (token) {
     try {
-      const payload = JSON.parse(
-        atob(token.split('.')[1])
-      );
-
+      const payload = JSON.parse(atob(token.split('.')[1]));
       currentUserId = payload.id;
     } catch (decodeError) {
       console.error('JWT decode error:', decodeError);
     }
   }
 
-
-  // ========================================
-  // LOAD CONVERSATIONS AND CHAT HISTORY
-  // ========================================
-
+  // Load conversations and chat history
   useEffect(() => {
     if (!token) {
       navigate('/login');
@@ -74,21 +68,17 @@ export default function Chat() {
         setError('');
 
         const conversationsResponse = await fetch(
-          'http://localhost:8080/api/conversations',
+          `${API_BASE}/api/conversations`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
 
-        const conversationsData =
-          await conversationsResponse.json();
+        const conversationsData = await conversationsResponse.json();
 
         if (!conversationsResponse.ok) {
           throw new Error(
-            conversationsData.message ||
-            'Failed to load conversations'
+            conversationsData.message || 'Failed to load conversations'
           );
         }
 
@@ -103,55 +93,42 @@ export default function Chat() {
           if (conversationsData.length > 0) {
             navigate(`/chat/${conversationsData[0]._id}`);
           }
-
           return;
         }
 
-        const selectedConversation =
-          conversationsData.find(
-            (item) => item._id === conversationId
-          );
+        const selectedConversation = conversationsData.find(
+          (item) => String(item._id) === String(conversationId)
+        );
 
         if (!selectedConversation) {
           setConversation(null);
           setLocalMessages([]);
-
-          setError(
-            'This conversation is not in your conversation list.'
-          );
-
+          setError('This conversation is not in your conversation list.');
           return;
         }
 
         const conversationResponse = await fetch(
-          `http://localhost:8080/api/conversations/${conversationId}`,
+          `${API_BASE}/api/conversations/${conversationId}`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
 
-        const conversationData =
-          await conversationResponse.json();
+        const conversationData = await conversationResponse.json();
 
         if (!conversationResponse.ok) {
           throw new Error(
-            conversationData.message ||
-            'Failed to load conversation'
+            conversationData.message || 'Failed to load conversation'
           );
         }
 
         if (cancelled) return;
-
         setConversation(conversationData);
 
         const messagesResponse = await fetch(
-          `http://localhost:8080/api/messages/${conversationId}`,
+          `${API_BASE}/api/messages/${conversationId}`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
 
@@ -159,13 +136,11 @@ export default function Chat() {
 
         if (!messagesResponse.ok) {
           throw new Error(
-            messagesData.message ||
-            'Failed to load messages'
+            messagesData.message || 'Failed to load messages'
           );
         }
 
         if (cancelled) return;
-
         setLocalMessages(messagesData);
       } catch (loadError) {
         if (!cancelled) {
@@ -173,9 +148,7 @@ export default function Chat() {
           setError(loadError.message || 'Unable to load chat.');
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -186,33 +159,36 @@ export default function Chat() {
     };
   }, [conversationId, token, navigate]);
 
-
-  // ========================================
-  // SOCKET.IO
-  // ========================================
-
+  // Socket connection and real-time events
   useEffect(() => {
-    if (!conversationId) return;
+    if (!token || !conversationId) return;
 
     const handleConnect = () => {
+      setError('');
       socket.emit('joinConversation', conversationId);
     };
 
     const handleReceiveMessage = (message) => {
+      const receivedConversationId =
+        message.conversation?._id ?? message.conversation;
+
       if (
-        String(message.conversation) !==
-        String(conversationId)
+        String(receivedConversationId) !== String(conversationId)
       ) {
         return;
       }
 
       setLocalMessages((previousMessages) => {
-        const alreadyExists = previousMessages.some(
-          (existingMessage) =>
-            existingMessage._id === message._id
-        );
+        const messageId = message._id
+          ? String(message._id)
+          : null;
 
-        if (alreadyExists) {
+        if (
+          messageId &&
+          previousMessages.some(
+            (existing) => String(existing._id) === messageId
+          )
+        ) {
           return previousMessages;
         }
 
@@ -220,8 +196,30 @@ export default function Chat() {
       });
     };
 
+    const handleNewNotification = (notification) => {
+      if (
+        notification?.type === 'general' ||
+        notification?.title === 'New message received'
+      ) {
+        setMessageNotice(
+          notification.message || 'You received a new message.'
+        );
+
+        window.dispatchEvent(new Event('notificationsUpdated'));
+      }
+    };
+
+    const handleConnectError = (connectError) => {
+      console.error('Socket connection error:', connectError.message);
+      setError(
+        'Live chat connection failed. Check your login and backend connection.'
+      );
+    };
+
     socket.on('connect', handleConnect);
+    socket.on('connect_error', handleConnectError);
     socket.on('receiveMessage', handleReceiveMessage);
+    socket.on('newNotification', handleNewNotification);
 
     if (!socket.connected) {
       socket.connect();
@@ -231,46 +229,56 @@ export default function Chat() {
 
     return () => {
       socket.off('connect', handleConnect);
+      socket.off('connect_error', handleConnectError);
       socket.off('receiveMessage', handleReceiveMessage);
+      socket.off('newNotification', handleNewNotification);
+
       socket.disconnect();
     };
-  }, [conversationId]);
+  }, [conversationId, token]);
 
-
-  // ========================================
-  // SEND MESSAGE
-  // ========================================
-
+  // Send a message
   const handleSend = () => {
     const text = draft.trim();
 
     if (!text || !conversationId) return;
 
     if (!currentUserId) {
-      setError('Please login first.');
+      setError('Please log in again.');
+      return;
+    }
+
+    if (!socket.connected) {
+      setError('Live chat is not connected. Please try again.');
       return;
     }
 
     setError('');
 
-    socket.emit('sendMessage', {
-      conversationId,
-      sender: currentUserId,
-      text,
-    });
+    socket.emit(
+      'sendMessage',
+      {
+        conversationId,
+        text,
+      },
+      (result) => {
+        if (!result?.ok) {
+          setError(
+            result?.message ||
+              'Message could not be sent. Please try again.'
+          );
+          return;
+        }
+
+        setError('');
+      }
+    );
 
     setDraft('');
   };
 
-
-  // ========================================
-  // DELETE CONVERSATION
-  // ========================================
-
-  const handleDeleteConversation = async (
-    event,
-    item
-  ) => {
+  // Delete a conversation
+  const handleDeleteConversation = async (event, item) => {
     event.stopPropagation();
 
     const confirmed = window.confirm(
@@ -283,12 +291,10 @@ export default function Chat() {
       setError('');
 
       const response = await fetch(
-        `http://localhost:8080/api/conversations/${item._id}`,
+        `${API_BASE}/api/conversations/${item._id}`,
         {
           method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -300,14 +306,13 @@ export default function Chat() {
         );
       }
 
-      const remainingConversations =
-        conversations.filter(
-          (existing) => existing._id !== item._id
-        );
+      const remainingConversations = conversations.filter(
+        (existing) => String(existing._id) !== String(item._id)
+      );
 
       setConversations(remainingConversations);
 
-      if (conversationId === item._id) {
+      if (String(conversationId) === String(item._id)) {
         setConversation(null);
         setLocalMessages([]);
 
@@ -319,28 +324,16 @@ export default function Chat() {
       }
     } catch (deleteError) {
       console.error('Delete conversation error:', deleteError);
-
       setError(
         deleteError.message || 'Unable to delete conversation.'
       );
     }
   };
 
-
-  // ========================================
-  // FIND OTHER PARTICIPANT
-  // ========================================
-
-  const otherParticipant =
-    conversation?.participants?.find(
-      (participant) =>
-        String(participant._id) !== String(currentUserId)
-    );
-
-
-  // ========================================
-  // LOADING
-  // ========================================
+  const otherParticipant = conversation?.participants?.find(
+    (participant) =>
+      String(participant._id) !== String(currentUserId)
+  );
 
   if (loading) {
     return (
@@ -352,26 +345,18 @@ export default function Chat() {
     );
   }
 
-
-  // ========================================
-  // UI
-  // ========================================
-
   return (
     <Box
       sx={{
         display: 'flex',
         height: 'calc(100vh - 160px)',
-        gap: 0,
         border: '1px solid',
         borderColor: 'divider',
         borderRadius: 3,
         overflow: 'hidden',
       }}
     >
-
-      {/* CONVERSATION SIDEBAR */}
-
+      {/* Conversation sidebar */}
       <Box
         sx={{
           width: 320,
@@ -390,12 +375,7 @@ export default function Chat() {
 
         <List sx={{ p: 0 }}>
           {conversations.length === 0 ? (
-            <Typography
-              sx={{
-                p: 2,
-                color: 'text.secondary',
-              }}
-            >
+            <Typography sx={{ p: 2, color: 'text.secondary' }}>
               No conversations yet.
             </Typography>
           ) : (
@@ -408,32 +388,24 @@ export default function Chat() {
               return (
                 <ListItemButton
                   key={item._id}
-                  selected={item._id === conversationId}
+                  selected={String(item._id) === String(conversationId)}
                   onClick={() => navigate(`/chat/${item._id}`)}
                   sx={{
                     py: 1.5,
-                    '&.Mui-selected': {
-                      bgcolor: '#F2EFE6',
-                    },
+                    '&.Mui-selected': { bgcolor: '#F2EFE6' },
                   }}
                 >
                   <ListItemAvatar>
                     <Avatar>
-                      {otherUser?.name
-                        ?.charAt(0)
-                        ?.toUpperCase() || '?'}
+                      {otherUser?.name?.charAt(0)?.toUpperCase() || '?'}
                     </Avatar>
                   </ListItemAvatar>
 
                   <ListItemText
                     primary={otherUser?.name || 'Unknown user'}
                     secondary={item.listing?.title || 'Listing'}
-                    primaryTypographyProps={{
-                      noWrap: true,
-                    }}
-                    secondaryTypographyProps={{
-                      noWrap: true,
-                    }}
+                    primaryTypographyProps={{ noWrap: true }}
+                    secondaryTypographyProps={{ noWrap: true }}
                   />
 
                   <Tooltip title="Delete conversation">
@@ -456,9 +428,7 @@ export default function Chat() {
         </List>
       </Box>
 
-
-      {/* CHAT AREA */}
-
+      {/* Chat area */}
       <Box
         sx={{
           flexGrow: 1,
@@ -468,8 +438,6 @@ export default function Chat() {
           bgcolor: '#FBFAF6',
         }}
       >
-        {/* HEADER */}
-
         <Box
           sx={{
             p: 2,
@@ -482,16 +450,10 @@ export default function Chat() {
             {otherParticipant?.name || 'Conversation'}
           </Typography>
 
-          <Typography
-            variant="caption"
-            color="text.secondary"
-          >
+          <Typography variant="caption" color="text.secondary">
             About: {conversation?.listing?.title || 'Listing'}
           </Typography>
         </Box>
-
-
-        {/* ERROR */}
 
         {error && (
           <Box sx={{ px: 2, pt: 2 }}>
@@ -501,9 +463,7 @@ export default function Chat() {
           </Box>
         )}
 
-
-        {/* MESSAGES */}
-
+        {/* Messages */}
         <Box
           sx={{
             flexGrow: 1,
@@ -530,9 +490,7 @@ export default function Chat() {
             </Typography>
           ) : (
             localMessages.map((message) => {
-              const senderId =
-                message.sender?._id ?? message.sender;
-
+              const senderId = message.sender?._id ?? message.sender;
               const isMine =
                 String(senderId) === String(currentUserId);
 
@@ -541,9 +499,7 @@ export default function Chat() {
                   key={message._id}
                   sx={{
                     display: 'flex',
-                    justifyContent: isMine
-                      ? 'flex-end'
-                      : 'flex-start',
+                    justifyContent: isMine ? 'flex-end' : 'flex-start',
                   }}
                 >
                   <Paper
@@ -560,6 +516,7 @@ export default function Chat() {
                       border: isMine ? 'none' : '1px solid',
                       borderColor: 'divider',
                       borderRadius: 2.5,
+                      overflowWrap: 'anywhere',
                     }}
                   >
                     <Typography variant="body2">
@@ -575,12 +532,13 @@ export default function Chat() {
                       }}
                     >
                       {message.createdAt
-                        ? new Date(
-                            message.createdAt
-                          ).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
+                        ? new Date(message.createdAt).toLocaleTimeString(
+                            [],
+                            {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            }
+                          )
                         : 'Now'}
                     </Typography>
                   </Paper>
@@ -590,9 +548,7 @@ export default function Chat() {
           )}
         </Box>
 
-
-        {/* MESSAGE INPUT */}
-
+        {/* Message input */}
         <Box
           sx={{
             p: 2,
@@ -627,6 +583,23 @@ export default function Chat() {
           </IconButton>
         </Box>
       </Box>
+
+      {/* New message notification popup */}
+      <Snackbar
+        open={Boolean(messageNotice)}
+        autoHideDuration={4500}
+        onClose={() => setMessageNotice('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setMessageNotice('')}
+          severity="info"
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {messageNotice}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

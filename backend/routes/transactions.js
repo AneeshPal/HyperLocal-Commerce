@@ -3,11 +3,22 @@ import express from "express";
 import mongoose from "mongoose";
 import authMiddleware from "../middleware/auth.js";
 import Transaction from "../models/Transaction.js";
+import Notification from "../models/Notification.js";
+import Listing from "../models/Listing.js";
 import { createTransaction } from "../services/transactionService.js";
 
 const router = express.Router();
 
-// Create a transaction for a listing.
+// Notification failures must not undo a successful transaction update.
+async function createNotification(data) {
+  try {
+    await Notification.create(data);
+  } catch (error) {
+    console.error("Create notification error:", error);
+  }
+}
+
+// Create a transaction and notify the seller.
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const { listingId } = req.body;
@@ -24,6 +35,16 @@ router.post("/", authMiddleware, async (req, res) => {
     const transaction = await createTransaction({
       listingId,
       buyerId: req.user,
+    });
+
+    // A transaction is not proof of payment.
+    await createNotification({
+      user: transaction.seller,
+      type: "order_created",
+      title: "New order received",
+      message: "A buyer has placed an order for your listing. Open Orders to review it. Payment is not yet confirmed.",
+      relatedListing: transaction.listing,
+      relatedTransaction: transaction._id,
     });
 
     return res.status(201).json({
@@ -82,7 +103,6 @@ router.get("/mine", authMiddleware, async (req, res) => {
 });
 
 // Seller marks a paid transaction as delivered.
-// POST /api/transactions/:id/delivered
 router.post("/:id/delivered", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -119,6 +139,16 @@ router.post("/:id/delivered", authMiddleware, async (req, res) => {
       });
     }
 
+    await createNotification({
+      user: transaction.buyer,
+      type: "order_delivered",
+      title: "Order marked as delivered",
+      message:
+        "The seller has marked your order as delivered. Please confirm receipt when you have received it.",
+      relatedListing: transaction.listing,
+      relatedTransaction: transaction._id,
+    });
+
     return res.json({
       message: "Item marked as delivered.",
       transaction,
@@ -132,64 +162,68 @@ router.post("/:id/delivered", authMiddleware, async (req, res) => {
 });
 
 // Buyer confirms receipt.
-// POST /api/transactions/:id/confirm-receipt
-router.post(
-  "/:id/confirm-receipt",
-  authMiddleware,
-  async (req, res) => {
-    try {
-      const { id } = req.params;
+router.post("/:id/confirm-receipt", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
 
-      if (!mongoose.isValidObjectId(id)) {
-        return res.status(400).json({
-          message: "Invalid transaction ID.",
-        });
-      }
-
-      const transaction = await Transaction.findOneAndUpdate(
-        {
-          _id: id,
-          buyer: req.user,
-          paymentStatus: "paid",
-          fulfilmentStatus: "delivered",
-          resolutionStatus: "none",
-        },
-        {
-          $set: { resolutionStatus: "release_eligible" },
-          $push: {
-            events: {
-              type: "buyer_confirmed_receipt",
-              actorId: req.user,
-              note: "Buyer confirmed receipt of the item.",
-            },
-          },
-        },
-        { returnDocument: "after", runValidators: true }
-      );
-
-      if (!transaction) {
-        return res.status(409).json({
-          message:
-            "Receipt cannot be confirmed. The item must be delivered and no dispute can be open.",
-        });
-      }
-
-      return res.json({
-        message:
-          "Receipt confirmed. Transaction is eligible for settlement review.",
-        transaction,
-      });
-    } catch (error) {
-      console.error("Confirm receipt error:", error);
-      return res.status(500).json({
-        message: "Failed to confirm receipt.",
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        message: "Invalid transaction ID.",
       });
     }
+
+    const transaction = await Transaction.findOneAndUpdate(
+      {
+        _id: id,
+        buyer: req.user,
+        paymentStatus: "paid",
+        fulfilmentStatus: "delivered",
+        resolutionStatus: "none",
+      },
+      {
+        $set: { resolutionStatus: "release_eligible" },
+        $push: {
+          events: {
+            type: "buyer_confirmed_receipt",
+            actorId: req.user,
+            note: "Buyer confirmed receipt of the item.",
+          },
+        },
+      },
+      { returnDocument: "after", runValidators: true }
+    );
+
+    if (!transaction) {
+      return res.status(409).json({
+        message:
+          "Receipt cannot be confirmed. The item must be delivered and no dispute can be open.",
+      });
+    }
+
+    await createNotification({
+      user: transaction.seller,
+      type: "receipt_confirmed",
+      title: "Buyer confirmed receipt",
+      message:
+        "The buyer confirmed receipt. The transaction is eligible for settlement review; funds have not necessarily been released.",
+      relatedListing: transaction.listing,
+      relatedTransaction: transaction._id,
+    });
+
+    return res.json({
+      message:
+        "Receipt confirmed. Transaction is eligible for settlement review.",
+      transaction,
+    });
+  } catch (error) {
+    console.error("Confirm receipt error:", error);
+    return res.status(500).json({
+      message: "Failed to confirm receipt.",
+    });
   }
-);
+});
 
 // Buyer opens a dispute.
-// POST /api/transactions/:id/dispute
 router.post("/:id/dispute", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -205,7 +239,9 @@ router.post("/:id/dispute", authMiddleware, async (req, res) => {
       });
     }
 
-    if (reason.trim().length > 1000) {
+    const disputeReason = reason.trim();
+
+    if (disputeReason.length > 1000) {
       return res.status(400).json({
         message: "Dispute reason must be 1000 characters or fewer.",
       });
@@ -225,7 +261,7 @@ router.post("/:id/dispute", authMiddleware, async (req, res) => {
           events: {
             type: "dispute_opened",
             actorId: req.user,
-            note: reason.trim(),
+            note: disputeReason,
           },
         },
       },
@@ -238,6 +274,15 @@ router.post("/:id/dispute", authMiddleware, async (req, res) => {
           "A dispute cannot be opened for this transaction in its current state.",
       });
     }
+
+    await createNotification({
+      user: transaction.seller,
+      type: "dispute_opened",
+      title: "Dispute opened",
+      message: `The buyer has opened a dispute. Reason: ${disputeReason}`,
+      relatedListing: transaction.listing,
+      relatedTransaction: transaction._id,
+    });
 
     return res.json({
       message: "Dispute opened successfully.",

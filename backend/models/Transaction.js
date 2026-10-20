@@ -83,6 +83,7 @@ const transactionSchema = new mongoose.Schema(
       enum: [
         "not_started",
         "in_progress",
+        "dispatched",
         "delivered",
         "cancelled",
       ],
