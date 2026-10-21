@@ -1,3 +1,4 @@
+
 import {
   Box,
   Typography,
@@ -7,14 +8,13 @@ import {
   Tabs,
   Tab,
   Button,
-  CircularProgress
+  CircularProgress,
 } from '@mui/material';
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ListingCard from '../components/ListingCard';
-
-const API_URL = 'http://localhost:8080/api';
+import { API_URL } from '../config';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -52,32 +52,36 @@ export default function Profile() {
         const [userResponse, listingsResponse] = await Promise.all([
           fetch(`${API_URL}/auth/me`, {
             headers: {
-              Authorization: `Bearer ${token}`
-            }
+              Authorization: `Bearer ${token}`,
+            },
           }),
           fetch(`${API_URL}/listings/mine`, {
             headers: {
-              Authorization: `Bearer ${token}`
-            }
-          })
+              Authorization: `Bearer ${token}`,
+            },
+          }),
         ]);
 
-        const userData = await userResponse.json();
-        const listingsData = await listingsResponse.json();
+        const userData = await userResponse.json().catch(() => null);
+        const listingsData = await listingsResponse.json().catch(() => null);
 
         if (!userResponse.ok) {
           throw new Error(
-            userData.message || 'Unable to load your profile.'
+            userData?.message || 'Unable to load your profile.'
           );
         }
 
         if (!listingsResponse.ok) {
           throw new Error(
-            listingsData.message || 'Unable to load your listings.'
+            listingsData?.message || 'Unable to load your listings.'
           );
         }
 
-        const actualUser = userData.user || userData;
+        const actualUser = userData?.user || userData;
+
+        if (!actualUser || typeof actualUser !== 'object') {
+          throw new Error('The server returned invalid profile data.');
+        }
 
         if (!cancelled) {
           setUser(actualUser);
@@ -128,7 +132,7 @@ export default function Profile() {
           p: { xs: 2.5, md: 4 },
           borderRadius: 3,
           borderColor: 'divider',
-          mb: 4
+          mb: 4,
         }}
       >
         <Box
@@ -136,7 +140,7 @@ export default function Profile() {
             display: 'flex',
             alignItems: 'center',
             gap: 3,
-            flexWrap: 'wrap'
+            flexWrap: 'wrap',
           }}
         >
           <Avatar
@@ -146,7 +150,7 @@ export default function Profile() {
               bgcolor: '#0284C7',
               color: '#FFFFFF',
               fontSize: 26,
-              fontWeight: 700
+              fontWeight: 700,
             }}
           >
             {initials}
@@ -167,10 +171,7 @@ export default function Profile() {
             </Typography>
           </Box>
 
-          <Button
-            variant="outlined"
-            onClick={() => navigate('/')}
-          >
+          <Button variant="outlined" onClick={() => navigate('/')}>
             Back to listings
           </Button>
         </Box>
@@ -191,16 +192,13 @@ export default function Profile() {
               sx={{
                 display: 'flex',
                 justifyContent: 'center',
-                py: 6
+                py: 6,
               }}
             >
               <CircularProgress />
             </Box>
           ) : error ? (
-            <Paper
-              variant="outlined"
-              sx={{ p: 3, borderRadius: 3 }}
-            >
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
               <Typography color="error">{error}</Typography>
 
               {error.toLowerCase().includes('log in') && (
@@ -219,7 +217,7 @@ export default function Profile() {
               sx={{
                 p: 4,
                 textAlign: 'center',
-                borderRadius: 3
+                borderRadius: 3,
               }}
             >
               <Typography variant="h6">No listings yet</Typography>

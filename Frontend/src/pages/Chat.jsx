@@ -23,9 +23,7 @@ import SendIcon from '@mui/icons-material/Send';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 import socket from '../socket';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+import { API_URL } from '../config';
 
 export default function Chat() {
   const { id } = useParams();
@@ -47,16 +45,17 @@ export default function Chat() {
   if (token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      currentUserId = payload.id;
+      currentUserId = payload.id || payload.userId || payload.sub || null;
     } catch (decodeError) {
       console.error('JWT decode error:', decodeError);
     }
   }
 
-  // Load conversations and chat history
+  // Load conversations and chat history.
   useEffect(() => {
     if (!token) {
       navigate('/login');
+      setLoading(false);
       return;
     }
 
@@ -68,18 +67,24 @@ export default function Chat() {
         setError('');
 
         const conversationsResponse = await fetch(
-          `${API_BASE}/api/conversations`,
+          `${API_URL}/conversations`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
 
-        const conversationsData = await conversationsResponse.json();
+        const conversationsData = await conversationsResponse
+          .json()
+          .catch(() => null);
 
         if (!conversationsResponse.ok) {
           throw new Error(
-            conversationsData.message || 'Failed to load conversations'
+            conversationsData?.message || 'Failed to load conversations'
           );
+        }
+
+        if (!Array.isArray(conversationsData)) {
+          throw new Error('Unexpected response while loading conversations.');
         }
 
         if (cancelled) return;
@@ -93,6 +98,7 @@ export default function Chat() {
           if (conversationsData.length > 0) {
             navigate(`/chat/${conversationsData[0]._id}`);
           }
+
           return;
         }
 
@@ -108,17 +114,19 @@ export default function Chat() {
         }
 
         const conversationResponse = await fetch(
-          `${API_BASE}/api/conversations/${conversationId}`,
+          `${API_URL}/conversations/${encodeURIComponent(conversationId)}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
 
-        const conversationData = await conversationResponse.json();
+        const conversationData = await conversationResponse
+          .json()
+          .catch(() => null);
 
         if (!conversationResponse.ok) {
           throw new Error(
-            conversationData.message || 'Failed to load conversation'
+            conversationData?.message || 'Failed to load conversation'
           );
         }
 
@@ -126,18 +134,22 @@ export default function Chat() {
         setConversation(conversationData);
 
         const messagesResponse = await fetch(
-          `${API_BASE}/api/messages/${conversationId}`,
+          `${API_URL}/messages/${encodeURIComponent(conversationId)}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
 
-        const messagesData = await messagesResponse.json();
+        const messagesData = await messagesResponse.json().catch(() => null);
 
         if (!messagesResponse.ok) {
           throw new Error(
-            messagesData.message || 'Failed to load messages'
+            messagesData?.message || 'Failed to load messages'
           );
+        }
+
+        if (!Array.isArray(messagesData)) {
+          throw new Error('Unexpected response while loading messages.');
         }
 
         if (cancelled) return;
@@ -159,7 +171,7 @@ export default function Chat() {
     };
   }, [conversationId, token, navigate]);
 
-  // Socket connection and real-time events
+  // Socket connection and real-time events.
   useEffect(() => {
     if (!token || !conversationId) return;
 
@@ -172,16 +184,12 @@ export default function Chat() {
       const receivedConversationId =
         message.conversation?._id ?? message.conversation;
 
-      if (
-        String(receivedConversationId) !== String(conversationId)
-      ) {
+      if (String(receivedConversationId) !== String(conversationId)) {
         return;
       }
 
       setLocalMessages((previousMessages) => {
-        const messageId = message._id
-          ? String(message._id)
-          : null;
+        const messageId = message._id ? String(message._id) : null;
 
         if (
           messageId &&
@@ -237,7 +245,7 @@ export default function Chat() {
     };
   }, [conversationId, token]);
 
-  // Send a message
+  // Send a message.
   const handleSend = () => {
     const text = draft.trim();
 
@@ -255,29 +263,21 @@ export default function Chat() {
 
     setError('');
 
-    socket.emit(
-      'sendMessage',
-      {
-        conversationId,
-        text,
-      },
-      (result) => {
-        if (!result?.ok) {
-          setError(
-            result?.message ||
-              'Message could not be sent. Please try again.'
-          );
-          return;
-        }
-
-        setError('');
+    socket.emit('sendMessage', { conversationId, text }, (result) => {
+      if (!result?.ok) {
+        setError(
+          result?.message || 'Message could not be sent. Please try again.'
+        );
+        return;
       }
-    );
+
+      setError('');
+    });
 
     setDraft('');
   };
 
-  // Delete a conversation
+  // Delete a conversation.
   const handleDeleteConversation = async (event, item) => {
     event.stopPropagation();
 
@@ -291,18 +291,18 @@ export default function Chat() {
       setError('');
 
       const response = await fetch(
-        `${API_BASE}/api/conversations/${item._id}`,
+        `${API_URL}/conversations/${encodeURIComponent(item._id)}`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw new Error(
-          data.message || 'Failed to delete conversation'
+          data?.message || 'Failed to delete conversation'
         );
       }
 
@@ -324,23 +324,18 @@ export default function Chat() {
       }
     } catch (deleteError) {
       console.error('Delete conversation error:', deleteError);
-      setError(
-        deleteError.message || 'Unable to delete conversation.'
-      );
+      setError(deleteError.message || 'Unable to delete conversation.');
     }
   };
 
   const otherParticipant = conversation?.participants?.find(
-    (participant) =>
-      String(participant._id) !== String(currentUserId)
+    (participant) => String(participant._id) !== String(currentUserId)
   );
 
   if (loading) {
     return (
       <Box sx={{ py: 8, textAlign: 'center' }}>
-        <Typography color="text.secondary">
-          Loading chat...
-        </Typography>
+        <Typography color="text.secondary">Loading chat...</Typography>
       </Box>
     );
   }
@@ -414,9 +409,7 @@ export default function Chat() {
                       color="error"
                       aria-label="Delete conversation"
                       size="small"
-                      onClick={(event) =>
-                        handleDeleteConversation(event, item)
-                      }
+                      onClick={(event) => handleDeleteConversation(event, item)}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -491,8 +484,7 @@ export default function Chat() {
           ) : (
             localMessages.map((message) => {
               const senderId = message.sender?._id ?? message.sender;
-              const isMine =
-                String(senderId) === String(currentUserId);
+              const isMine = String(senderId) === String(currentUserId);
 
               return (
                 <Box
@@ -507,21 +499,15 @@ export default function Chat() {
                       px: 2,
                       py: 1,
                       maxWidth: '60%',
-                      bgcolor: isMine
-                        ? 'primary.main'
-                        : 'background.paper',
-                      color: isMine
-                        ? 'primary.contrastText'
-                        : 'text.primary',
+                      bgcolor: isMine ? 'primary.main' : 'background.paper',
+                      color: isMine ? 'primary.contrastText' : 'text.primary',
                       border: isMine ? 'none' : '1px solid',
                       borderColor: 'divider',
                       borderRadius: 2.5,
                       overflowWrap: 'anywhere',
                     }}
                   >
-                    <Typography variant="body2">
-                      {message.text}
-                    </Typography>
+                    <Typography variant="body2">{message.text}</Typography>
 
                     <Typography
                       variant="caption"
@@ -534,10 +520,7 @@ export default function Chat() {
                       {message.createdAt
                         ? new Date(message.createdAt).toLocaleTimeString(
                             [],
-                            {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            }
+                            { hour: '2-digit', minute: '2-digit' }
                           )
                         : 'Now'}
                     </Typography>

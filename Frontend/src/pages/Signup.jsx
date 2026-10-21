@@ -1,14 +1,16 @@
+
 import {
   Box,
   Paper,
   TextField,
   Button,
   Typography,
-  Link as MLink
+  Link as MLink,
 } from '@mui/material';
 
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { API_URL } from '../config';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -27,26 +29,23 @@ export default function Signup() {
     setSubmitting(true);
 
     try {
-      const response = await fetch(
-        'http://localhost:8080/api/auth/signup',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name,
-            email,
-            password,
-            neighborhood
-          })
-        }
-      );
+      const response = await fetch(`${API_URL}/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          neighborhood,
+        }),
+      });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        setError(data.message || 'Signup failed');
+        setError(data?.message || 'Signup failed');
         return;
       }
 
@@ -67,7 +66,7 @@ export default function Signup() {
         alignItems: 'center',
         justifyContent: 'center',
         bgcolor: 'background.default',
-        px: 2
+        px: 2,
       }}
     >
       <Paper
@@ -77,7 +76,7 @@ export default function Signup() {
           width: 400,
           maxWidth: '100%',
           borderRadius: 3,
-          borderColor: 'divider'
+          borderColor: 'divider',
         }}
       >
         <Typography variant="h4" sx={{ color: 'primary.dark' }}>
@@ -94,7 +93,7 @@ export default function Signup() {
           sx={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 2
+            gap: 2,
           }}
         >
           <TextField

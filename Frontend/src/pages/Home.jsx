@@ -12,9 +12,7 @@ import {
 import { useOutletContext, useLocation } from 'react-router-dom';
 import ListingCard from '../components/ListingCard';
 import { categories } from '../data/mockData';
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+import { API_URL } from '../config';
 
 const RADIUS_OPTIONS = [
   { value: 'infinite', label: 'All locations' },
@@ -143,7 +141,7 @@ export default function Home() {
         const query = params.toString();
 
         const response = await fetch(
-          `${API_BASE_URL}/api/listings${query ? `?${query}` : ''}`,
+          `${API_URL}/listings${query ? `?${query}` : ''}`,
           { signal }
         );
 

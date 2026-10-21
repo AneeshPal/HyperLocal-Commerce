@@ -1,14 +1,16 @@
+
 import {
   Box,
   Paper,
   TextField,
   Button,
   Typography,
-  Link as MLink
+  Link as MLink,
 } from '@mui/material';
 
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { API_URL } from '../config';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -25,28 +27,25 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      const response = await fetch(
-        'http://localhost:8080/api/auth/login',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            email,
-            password
-          })
-        }
-      );
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        setError(data.message || 'Login failed');
+        setError(data?.message || 'Login failed');
         return;
       }
 
-      if (!data.token || !data.user) {
+      if (!data?.token || !data?.user) {
         setError('The server did not return the required login details.');
         return;
       }
@@ -74,7 +73,7 @@ export default function Login() {
         alignItems: 'center',
         justifyContent: 'center',
         bgcolor: 'background.default',
-        px: 2
+        px: 2,
       }}
     >
       <Paper
@@ -84,7 +83,7 @@ export default function Login() {
           width: 400,
           maxWidth: '100%',
           borderRadius: 3,
-          borderColor: 'divider'
+          borderColor: 'divider',
         }}
       >
         <Typography variant="h4" sx={{ color: 'primary.dark' }}>
@@ -101,7 +100,7 @@ export default function Login() {
           sx={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 2
+            gap: 2,
           }}
         >
           <TextField

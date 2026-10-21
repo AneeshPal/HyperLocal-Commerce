@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import {
   Box,
@@ -12,13 +13,10 @@ import {
 import AddPhotoAlternateOutlinedIcon from '@mui/icons-material/AddPhotoAlternateOutlined';
 import { useNavigate } from 'react-router-dom';
 import { categories } from '../data/mockData';
+import { API_URL } from '../config';
 
 export default function CreateListing() {
   const navigate = useNavigate();
-
-  // -----------------------------
-  // LISTING FORM DATA
-  // -----------------------------
 
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -27,29 +25,18 @@ export default function CreateListing() {
   const [description, setDescription] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
 
-  // -----------------------------
-  // IMAGES
-  // -----------------------------
-
   const [images, setImages] = useState([]);
-
-  // -----------------------------
-  // UI STATES
-  // -----------------------------
 
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
 
-  // -----------------------------
-  // IMAGE SELECTION
-  // -----------------------------
-
-  const handleImageChange = (e) => {
-    const selectedFiles = Array.from(e.target.files);
+  const handleImageChange = (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
 
     if (selectedFiles.length > 6) {
       setError('You can select up to 6 images.');
+      event.target.value = '';
       return;
     }
 
@@ -57,19 +44,12 @@ export default function CreateListing() {
     setImages(selectedFiles);
   };
 
-  // -----------------------------
-  // GET CURRENT LOCATION
-  // -----------------------------
-
   const getCurrentLocation = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(
-          new Error(
-            'Geolocation is not supported by this browser.'
-          )
+          new Error('Geolocation is not supported by this browser.')
         );
-
         return;
       }
 
@@ -80,11 +60,9 @@ export default function CreateListing() {
             longitude: position.coords.longitude,
           });
         },
-
         (error) => {
           reject(error);
         },
-
         {
           enableHighAccuracy: true,
           timeout: 10000,
@@ -94,185 +72,102 @@ export default function CreateListing() {
     });
   };
 
-  // -----------------------------
-  // SUBMIT LISTING
-  // -----------------------------
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
     setError('');
-    setLocationLoading(true);
 
     const token = localStorage.getItem('token');
 
     if (!token) {
-      setError(
-        'Please login before creating a listing.'
-      );
-
-      setLocationLoading(false);
+      setError('Please login before creating a listing.');
       return;
     }
 
-    try {
-      // =========================================
-      // STEP 1: GET REAL USER LOCATION
-      // =========================================
+    setLocationLoading(true);
 
+    try {
+      // Step 1: Get the user's location.
       const location = await getCurrentLocation();
 
-      console.log(
-        'Listing latitude:',
-        location.latitude
-      );
+      // Step 2: Create the listing.
+      const response = await fetch(`${API_URL}/listings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title,
+          price: Number(price),
+          category,
+          condition,
+          description,
+          // GeoJSON coordinates use [longitude, latitude].
+          coordinates: [location.longitude, location.latitude],
+          neighborhood,
+        }),
+      });
 
-      console.log(
-        'Listing longitude:',
-        location.longitude
-      );
-
-      // =========================================
-      // STEP 2: CREATE LISTING
-      // =========================================
-
-      const response = await fetch(
-        'http://localhost:8080/api/listings',
-        {
-          method: 'POST',
-
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-
-          body: JSON.stringify({
-            title,
-            price: Number(price),
-            category,
-            condition,
-            description,
-
-            // GeoJSON order:
-            // [longitude, latitude]
-            coordinates: [
-              location.longitude,
-              location.latitude,
-            ],
-
-            neighborhood,
-          }),
-        }
-      );
-
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(
-          data.message ||
-          'Failed to create listing'
-        );
-
-        return;
+        throw new Error(data.message || 'Failed to create listing.');
       }
 
-      console.log(
-        'Listing created:',
-        data
-      );
+      const listingId = data.listing?._id || data._id;
 
-      const listingId =
-        data.listing._id;
+      if (!listingId) {
+        throw new Error(
+          'The listing may have been created, but the server did not return its ID.'
+        );
+      }
 
-      // =========================================
-      // STEP 3: UPLOAD IMAGES
-      // =========================================
-
+      // Step 3: Upload images, if selected.
       if (images.length > 0) {
         const formData = new FormData();
 
         images.forEach((image) => {
-          formData.append(
-            'images',
-            image
-          );
+          formData.append('images', image);
         });
 
-        const imageResponse =
-          await fetch(
-            `http://localhost:8080/api/listings/${listingId}/images`,
-            {
-              method: 'POST',
+        const imageResponse = await fetch(
+          `${API_URL}/listings/${encodeURIComponent(listingId)}/images`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+          }
+        );
 
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-              },
-
-              body: formData,
-            }
-          );
-
-        const imageData =
-          await imageResponse.json();
+        const imageData = await imageResponse.json().catch(() => ({}));
 
         if (!imageResponse.ok) {
-          console.error(
-            'Image upload failed:',
-            imageData
-          );
-
-          setError(
+          throw new Error(
             imageData.message ||
-            'Listing created, but image upload failed.'
+              'Listing created, but image upload failed. You can edit the listing to try uploading images again.'
           );
-
-          return;
         }
-
-        console.log(
-          'Images uploaded:',
-          imageData
-        );
       }
 
-      // =========================================
-      // STEP 4: SUCCESS
-      // =========================================
-
+      // Step 4: Finish.
       setSubmitted(true);
-
       navigate('/');
-
     } catch (error) {
-      console.error(
-        'Create listing error:',
-        error
-      );
+      console.error('Create listing error:', error);
 
-      if (
-        error.code === 1
-      ) {
+      if (error.code === 1) {
         setError(
           'Location permission was denied. Please allow location access to create a listing.'
         );
-      } else if (
-        error.code === 2
-      ) {
-        setError(
-          'Your location could not be determined.'
-        );
-      } else if (
-        error.code === 3
-      ) {
-        setError(
-          'Getting your location took too long. Please try again.'
-        );
+      } else if (error.code === 2) {
+        setError('Your location could not be determined.');
+      } else if (error.code === 3) {
+        setError('Getting your location took too long. Please try again.');
       } else {
-        setError(
-          error.message ||
-          'Something went wrong. Please try again.'
-        );
+        setError(error.message || 'Something went wrong. Please try again.');
       }
     } finally {
       setLocationLoading(false);
@@ -281,15 +176,7 @@ export default function CreateListing() {
 
   return (
     <Box sx={{ maxWidth: 640 }}>
-
-      {/* ========================= */}
-      {/* HEADING */}
-      {/* ========================= */}
-
-      <Typography
-        variant="h4"
-        sx={{ mb: 0.5 }}
-      >
+      <Typography variant="h4" sx={{ mb: 0.5 }}>
         List something for sale
       </Typography>
 
@@ -298,8 +185,7 @@ export default function CreateListing() {
         color="text.secondary"
         sx={{ mb: 4 }}
       >
-        Buyers near you will see this
-        within your set radius.
+        Buyers near you will see this within your set radius.
       </Typography>
 
       <Paper
@@ -310,11 +196,6 @@ export default function CreateListing() {
           borderColor: 'divider',
         }}
       >
-
-        {/* ========================= */}
-        {/* IMAGE UPLOAD AREA */}
-        {/* ========================= */}
-
         <Box
           component="label"
           sx={{
@@ -327,10 +208,8 @@ export default function CreateListing() {
             mb: 3,
             cursor: 'pointer',
             display: 'block',
-
             '&:hover': {
-              backgroundColor:
-                'action.hover',
+              backgroundColor: 'action.hover',
             },
           }}
         >
@@ -358,13 +237,10 @@ export default function CreateListing() {
             accept="image/*"
             multiple
             hidden
-            onChange={
-              handleImageChange
-            }
+            onChange={handleImageChange}
           />
         </Box>
 
-        {/* Selected image count */}
         {images.length > 0 && (
           <Typography
             variant="body2"
@@ -373,17 +249,9 @@ export default function CreateListing() {
               fontWeight: 500,
             }}
           >
-            {images.length} image
-            {images.length > 1
-              ? 's'
-              : ''}{' '}
-            selected
+            {images.length} image{images.length > 1 ? 's' : ''} selected
           </Typography>
         )}
-
-        {/* ========================= */}
-        {/* FORM */}
-        {/* ========================= */}
 
         <Box
           component="form"
@@ -394,100 +262,62 @@ export default function CreateListing() {
             gap: 2.5,
           }}
         >
-
-          {/* Title */}
           <TextField
             label="Title"
             placeholder="e.g. Study table with chair"
             fullWidth
             required
             value={title}
-            onChange={(e) =>
-              setTitle(e.target.value)
-            }
+            onChange={(event) => setTitle(event.target.value)}
           />
 
-          {/* Price + Category */}
-          <Grid
-            container
-            spacing={2}
-          >
-            <Grid
-              item
-              xs={6}
-            >
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
               <TextField
                 label="Price (₹)"
                 type="number"
                 fullWidth
                 required
+                inputProps={{ min: 0, step: 'any' }}
                 value={price}
-                onChange={(e) =>
-                  setPrice(e.target.value)
-                }
+                onChange={(event) => setPrice(event.target.value)}
               />
             </Grid>
 
-            <Grid
-              item
-              xs={6}
-            >
+            <Grid item xs={6}>
               <TextField
                 label="Category"
                 select
                 fullWidth
                 required
                 value={category}
-                onChange={(e) =>
-                  setCategory(
-                    e.target.value
-                  )
-                }
+                onChange={(event) => setCategory(event.target.value)}
               >
                 {categories
-                  .filter(
-                    (c) => c !== 'All'
-                  )
-                  .map((c) => (
-                    <MenuItem
-                      key={c}
-                      value={c}
-                    >
-                      {c}
+                  .filter((item) => item !== 'All')
+                  .map((item) => (
+                    <MenuItem key={item} value={item}>
+                      {item}
                     </MenuItem>
                   ))}
               </TextField>
             </Grid>
           </Grid>
 
-          {/* Condition */}
           <TextField
             label="Condition"
             select
             fullWidth
             value={condition}
-            onChange={(e) =>
-              setCondition(
-                e.target.value
-              )
-            }
+            onChange={(event) => setCondition(event.target.value)}
           >
-            {[
-              'Like new',
-              'Good',
-              'Fair',
-              'Service',
-            ].map((c) => (
-              <MenuItem
-                key={c}
-                value={c}
-              >
-                {c}
+            {['Like new', 'Good', 'Fair', 'Service'].map((item) => (
+              <MenuItem key={item} value={item}>
+                {item}
               </MenuItem>
             ))}
           </TextField>
 
-          {/* Description */}
           <TextField
             label="Description"
             multiline
@@ -495,43 +325,29 @@ export default function CreateListing() {
             fullWidth
             placeholder="Describe what you're selling, why, and any details a buyer should know."
             value={description}
-            onChange={(e) =>
-              setDescription(
-                e.target.value
-              )
-            }
+            onChange={(event) => setDescription(event.target.value)}
           />
 
-          {/* Pickup location */}
           <TextField
             label="Pickup location"
             placeholder="e.g. Kakadeo, Kanpur"
             fullWidth
             required
             value={neighborhood}
-            onChange={(e) =>
-              setNeighborhood(
-                e.target.value
-              )
-            }
+            onChange={(event) => setNeighborhood(event.target.value)}
           />
 
-          {/* Error */}
           {error && (
-            <Typography color="error">
+            <Typography color="error" role="alert">
               {error}
             </Typography>
           )}
 
-          {/* Submit */}
           <Button
             type="submit"
             variant="contained"
             size="large"
-            disabled={
-              locationLoading ||
-              submitted
-            }
+            disabled={locationLoading || submitted}
             sx={{
               py: 1.2,
               mt: 1,
@@ -543,7 +359,6 @@ export default function CreateListing() {
                 ? 'Listing published'
                 : 'Publish listing'}
           </Button>
-
         </Box>
       </Paper>
     </Box>

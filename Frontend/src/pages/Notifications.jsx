@@ -9,9 +9,7 @@ import {
   Alert,
 } from '@mui/material';
 import CircleIcon from '@mui/icons-material/Circle';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+import { API_URL } from '../config';
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
@@ -34,25 +32,31 @@ export default function Notifications() {
       }
 
       const [notificationsResponse, countResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/notifications`, {
+        fetch(`${API_URL}/notifications`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${API_BASE}/api/notifications/unread-count`, {
+        fetch(`${API_URL}/notifications/unread-count`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
 
-      if (!notificationsResponse.ok || !countResponse.ok) {
-        throw new Error('Unable to load notifications. Please try again.');
-      }
+      const notificationData = await notificationsResponse
+        .json()
+        .catch(() => null);
+      const countData = await countResponse.json().catch(() => null);
 
-      const notificationData = await notificationsResponse.json();
-      const countData = await countResponse.json();
+      if (!notificationsResponse.ok || !countResponse.ok) {
+        throw new Error(
+          notificationData?.message ||
+            countData?.message ||
+            'Unable to load notifications. Please try again.'
+        );
+      }
 
       setNotifications(
         Array.isArray(notificationData) ? notificationData : []
       );
-      setUnreadCount(Number(countData.count) || 0);
+      setUnreadCount(Number(countData?.count) || 0);
     } catch (err) {
       setError(err.message || 'Unable to load notifications.');
     } finally {
@@ -66,20 +70,31 @@ export default function Notifications() {
 
   const markAsRead = async (id) => {
     try {
+      const token = getToken();
+
+      if (!token) {
+        throw new Error('Please log in to update notifications.');
+      }
+
       const response = await fetch(
-        `${API_BASE}/api/notifications/${id}/read`,
+        `${API_URL}/notifications/${encodeURIComponent(id)}/read`,
         {
           method: 'PATCH',
           headers: {
-            Authorization: `Bearer ${getToken()}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
 
+      const data = await response.json().catch(() => null);
+
       if (!response.ok) {
-        throw new Error('Could not mark notification as read.');
+        throw new Error(
+          data?.message || 'Could not mark notification as read.'
+        );
       }
 
+      window.dispatchEvent(new Event('notificationsUpdated'));
       await fetchNotifications();
     } catch (err) {
       setError(err.message || 'Could not update notification.');
@@ -88,20 +103,28 @@ export default function Notifications() {
 
   const markAllAsRead = async () => {
     try {
-      const response = await fetch(
-        `${API_BASE}/api/notifications/read-all`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
-        }
-      );
+      const token = getToken();
 
-      if (!response.ok) {
-        throw new Error('Could not mark all notifications as read.');
+      if (!token) {
+        throw new Error('Please log in to update notifications.');
       }
 
+      const response = await fetch(`${API_URL}/notifications/read-all`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || 'Could not mark all notifications as read.'
+        );
+      }
+
+      window.dispatchEvent(new Event('notificationsUpdated'));
       await fetchNotifications();
     } catch (err) {
       setError(err.message || 'Could not update notifications.');
@@ -169,7 +192,10 @@ export default function Notifications() {
           <CircularProgress />
         </Box>
       ) : notifications.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 4, borderRadius: 2, textAlign: 'center' }}>
+        <Paper
+          variant="outlined"
+          sx={{ p: 4, borderRadius: 2, textAlign: 'center' }}
+        >
           <Typography variant="body1" fontWeight={600}>
             No notifications yet
           </Typography>

@@ -18,8 +18,7 @@ import {
   TextField,
 } from '@mui/material';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+import { API_URL } from '../config';
 
 const STATUS_STEPS = [
   'Paid',
@@ -119,14 +118,11 @@ export default function Orders() {
         throw new Error('Please log in again to view your orders.');
       }
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/transactions/mine`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/transactions/mine`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       const data = await response.json().catch(() => null);
 
@@ -178,7 +174,7 @@ export default function Orders() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/api/transactions/${encodeURIComponent(id)}/${endpoint}`,
+        `${API_URL}/transactions/${encodeURIComponent(id)}/${endpoint}`,
         {
           method: 'POST',
           headers: {
@@ -256,11 +252,7 @@ export default function Orders() {
           severity="error"
           sx={{ mb: 2 }}
           action={
-            <Button
-              color="inherit"
-              size="small"
-              onClick={() => loadTransactions()}
-            >
+            <Button color="inherit" size="small" onClick={() => loadTransactions()}>
               Retry
             </Button>
           }
@@ -304,8 +296,7 @@ export default function Orders() {
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
         {transactions.map((transaction) => {
           const listing =
-            transaction.listing &&
-            typeof transaction.listing === 'object'
+            transaction.listing && typeof transaction.listing === 'object'
               ? transaction.listing
               : null;
 
@@ -313,27 +304,17 @@ export default function Orders() {
           const sellerId = getId(transaction.seller);
           const id = getId(transaction);
 
-          const isBuyer =
-            Boolean(currentUserId) && buyerId === currentUserId;
+          const isBuyer = Boolean(currentUserId) && buyerId === currentUserId;
+          const isSeller = Boolean(currentUserId) && sellerId === currentUserId;
 
-          const isSeller =
-            Boolean(currentUserId) && sellerId === currentUserId;
-
-          const role = isBuyer
-            ? 'Purchase'
-            : isSeller
-              ? 'Sale'
-              : 'Transaction';
+          const role = isBuyer ? 'Purchase' : isSeller ? 'Sale' : 'Transaction';
 
           const status = getStatus(transaction);
           const amount = Number(transaction.amountPaise) / 100;
           const paid = transaction.paymentStatus === 'paid';
-          const delivered =
-            transaction.fulfilmentStatus === 'delivered';
-          const cancelled =
-            transaction.fulfilmentStatus === 'cancelled';
-          const resolution =
-            transaction.resolutionStatus || 'none';
+          const delivered = transaction.fulfilmentStatus === 'delivered';
+          const cancelled = transaction.fulfilmentStatus === 'cancelled';
+          const resolution = transaction.resolutionStatus || 'none';
           const busy = busyId === id;
 
           const canMarkDelivered =
@@ -344,10 +325,7 @@ export default function Orders() {
             resolution === 'none';
 
           const canConfirmReceipt =
-            isBuyer &&
-            paid &&
-            delivered &&
-            resolution === 'none';
+            isBuyer && paid && delivered && resolution === 'none';
 
           const canDispute =
             isBuyer &&
@@ -457,8 +435,8 @@ export default function Orders() {
 
               {resolution === 'disputed' && (
                 <Alert severity="error" sx={{ mb: 2 }}>
-                  This transaction is disputed. Further actions are
-                  disabled until it is reviewed.
+                  This transaction is disputed. Further actions are disabled
+                  until it is reviewed.
                 </Alert>
               )}
 
@@ -538,8 +516,8 @@ export default function Orders() {
 
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Explain the issue with this order. Submitting this will mark
-            the transaction as disputed.
+            Explain the issue with this order. Submitting this will mark the
+            transaction as disputed.
           </Typography>
 
           <TextField

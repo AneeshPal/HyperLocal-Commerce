@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 
 import {
@@ -22,441 +23,227 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 
+import { API_URL } from '../config';
 
 export default function ListingDetail() {
-
   const { id } = useParams();
-
   const navigate = useNavigate();
 
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(0);
 
-  const [listing, setListing] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState('');
-
-  const [deleting, setDeleting] =
-    useState(false);
-
-  const [selectedImage, setSelectedImage] =
-    useState(0);
-
-
-  // -----------------------------
-  // FETCH LISTING
-  // -----------------------------
-
+  // Fetch listing.
   useEffect(() => {
+    let cancelled = false;
 
     const fetchListing = async () => {
-
       if (!id || id === 'undefined') {
-
-        setError(
-          'Invalid listing ID.'
-        );
-
+        setError('Invalid listing ID.');
         setLoading(false);
-
         return;
       }
 
-
       try {
-
-        console.log(
-          'Fetching listing:',
-          id
-        );
-
+        setLoading(true);
+        setError('');
 
         const response = await fetch(
-          `http://localhost:8080/api/listings/${id}`
+          `${API_URL}/listings/${encodeURIComponent(id)}`
         );
 
-
-        const data =
-          await response.json();
-
-
-        console.log(
-          'Listing response:',
-          data
-        );
-
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-
-          setError(
-            data.message ||
-            'Failed to load listing'
-          );
-
-          return;
+          throw new Error(data.message || 'Failed to load listing.');
         }
 
-
-        setListing(data);
-
+        if (!cancelled) {
+          setListing(data);
+          setSelectedImage(0);
+        }
       } catch (err) {
+        console.error('Listing fetch error:', err);
 
-        console.error(
-          'Listing fetch error:',
-          err
-        );
-
-
-        setError(
-          'Unable to load listing.'
-        );
-
+        if (!cancelled) {
+          setError(err.message || 'Unable to load listing.');
+        }
       } finally {
-
-        setLoading(false);
-
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-
     };
-
 
     fetchListing();
 
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
-
-  // -----------------------------
-  // LOADING
-  // -----------------------------
-
+  // Loading.
   if (loading) {
-
     return (
-      <Box
-        sx={{
-          py: 8,
-          textAlign: 'center',
-        }}
-      >
-        <Typography>
-          Loading listing...
-        </Typography>
+      <Box sx={{ py: 8, textAlign: 'center' }}>
+        <Typography>Loading listing...</Typography>
       </Box>
     );
-
   }
 
-
-  // -----------------------------
-  // ERROR
-  // -----------------------------
-
+  // Error.
   if (error || !listing) {
-
     return (
-      <Box
-        sx={{
-          py: 8,
-          textAlign: 'center',
-        }}
-      >
-
-        <Typography
-          color="error"
-          sx={{ mb: 2 }}
-        >
+      <Box sx={{ py: 8, textAlign: 'center' }}>
+        <Typography color="error" sx={{ mb: 2 }}>
           {error || 'Listing not found'}
         </Typography>
 
-
-        <Button
-          variant="outlined"
-          onClick={() => navigate('/')}
-        >
+        <Button variant="outlined" onClick={() => navigate('/')}>
           Back to Home
         </Button>
-
       </Box>
     );
-
   }
 
-
-  // -----------------------------
-  // TOKEN / OWNER
-  // -----------------------------
-
-  const token =
-    localStorage.getItem('token');
-
+  // Token and owner.
+  const token = localStorage.getItem('token');
 
   let currentUserId = null;
 
-
   if (token) {
-
     try {
-
-      const payload = JSON.parse(
-        atob(token.split('.')[1])
-      );
-
-
-      currentUserId =
-        payload.id || null;
-
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      currentUserId = payload.id || payload.userId || payload.sub || null;
     } catch (err) {
-
-      console.error(
-        'JWT decode error:',
-        err
-      );
-
+      console.error('JWT decode error:', err);
     }
-
   }
 
+  // Images.
+  const images = Array.isArray(listing.images) ? listing.images : [];
 
-  // -----------------------------
-  // IMAGES
-  // -----------------------------
-
-  const images =
-    Array.isArray(listing.images)
-      ? listing.images
-      : [];
-
+  const safeSelectedImage =
+    images.length > 0
+      ? Math.min(selectedImage, images.length - 1)
+      : 0;
 
   const currentImage =
-    images.length > 0
-      ? images[selectedImage]
-      : null;
+    images.length > 0 ? images[safeSelectedImage] : null;
 
-
-  // -----------------------------
-  // SELLER
-  // -----------------------------
-
+  // Seller.
   const seller =
-    listing.seller &&
-    typeof listing.seller === 'object'
+    listing.seller && typeof listing.seller === 'object'
       ? listing.seller
       : null;
 
+  const sellerName = seller?.name || 'Unknown seller';
+  const sellerEmail = seller?.email || '';
+  const sellerId = seller?._id || null;
 
-  const sellerName =
-    seller?.name || 'Unknown seller';
-
-
-  const sellerEmail =
-    seller?.email || '';
-
-
-  const sellerId =
-    seller?._id || null;
-
-
-  const sellerInitial =
-    sellerName
-      .charAt(0)
-      .toUpperCase();
-
+  const sellerInitial = sellerName.charAt(0).toUpperCase();
 
   const isOwner =
     currentUserId &&
     sellerId &&
-    String(currentUserId) ===
-      String(sellerId);
+    String(currentUserId) === String(sellerId);
 
-
-  // -----------------------------
-  // DELETE
-  // -----------------------------
-
+  // Delete listing.
   const handleDelete = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this listing?'
+    );
 
-    const confirmed =
-      window.confirm(
-        'Are you sure you want to delete this listing?'
-      );
-
-
-    if (!confirmed) {
-      return;
-    }
-
+    if (!confirmed) return;
 
     if (!token) {
-
-      setError(
-        'Please login first.'
-      );
-
+      setError('Please login first.');
       return;
     }
 
-
     try {
-
       setDeleting(true);
-
+      setError('');
 
       const response = await fetch(
-        `http://localhost:8080/api/listings/${id}`,
+        `${API_URL}/listings/${encodeURIComponent(id)}`,
         {
           method: 'DELETE',
-
           headers: {
-            Authorization:
-              `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
 
-
-      const data =
-        await response.json();
-
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-
-        setError(
-          data.message ||
-          'Failed to delete listing'
-        );
-
-        return;
+        throw new Error(data.message || 'Failed to delete listing.');
       }
-
-
-      console.log(
-        'Listing deleted:',
-        data
-      );
-
 
       navigate('/');
-
     } catch (err) {
-
-      console.error(
-        'Delete error:',
-        err
-      );
-
-
-      setError(
-        'Unable to delete listing.'
-      );
-
+      console.error('Delete error:', err);
+      setError(err.message || 'Unable to delete listing.');
     } finally {
-
       setDeleting(false);
-
     }
-
   };
 
-
-  // -----------------------------
-  // MESSAGE SELLER
-  // -----------------------------
-
+  // Message seller.
   const handleMessageSeller = async () => {
+    const currentToken = localStorage.getItem('token');
+
+    if (!currentToken) {
+      navigate('/login');
+      return;
+    }
+
+    if (isOwner) return;
 
     try {
+      setError('');
 
-      const token =
-        localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`,
+        },
+        body: JSON.stringify({
+          listingId: listing._id,
+        }),
+      });
 
-
-      if (!token) {
-
-        navigate('/login');
-
-        return;
-      }
-
-
-      const response = await fetch(
-        'http://localhost:8080/api/conversations',
-        {
-          method: 'POST',
-
-          headers: {
-            'Content-Type':
-              'application/json',
-
-            Authorization:
-              `Bearer ${token}`,
-          },
-
-          body: JSON.stringify({
-            listingId: listing._id,
-          }),
-        }
-      );
-
-
-      const data =
-        await response.json();
-
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-
-        setError(
-          data.message ||
-          'Failed to start conversation'
+        throw new Error(
+          data.message || 'Failed to start conversation.'
         );
-
-        return;
       }
 
+      const conversationId = data._id || data.conversation?._id;
 
-      console.log(
-        'Conversation:',
-        data
-      );
+      if (!conversationId) {
+        throw new Error(
+          'The server did not return a conversation ID.'
+        );
+      }
 
-
-      navigate(
-        `/chat/${data._id}`
-      );
-
-    } catch (error) {
-
-      console.error(
-        'Conversation error:',
-        error
-      );
-
-
-      setError(
-        'Unable to start conversation.'
-      );
-
+      navigate(`/chat/${conversationId}`);
+    } catch (err) {
+      console.error('Conversation error:', err);
+      setError(err.message || 'Unable to start conversation.');
     }
-
   };
 
-
-  // -----------------------------
-  // UI
-  // -----------------------------
-
   return (
-
     <Box>
-
-      {/* Back */}
-
       <Button
-        startIcon={
-          <ArrowBackIcon />
-        }
+        startIcon={<ArrowBackIcon />}
         onClick={() => navigate(-1)}
         sx={{
           mb: 2,
@@ -466,28 +253,11 @@ export default function ListingDetail() {
         Back
       </Button>
 
-
-      <Grid
-        container
-        spacing={4}
-      >
-
-        {/* ========================= */}
-        {/* IMAGE GALLERY */}
-        {/* ========================= */}
-
-        <Grid
-          item
-          xs={12}
-          md={7}
-        >
-
+      <Grid container spacing={4}>
+        {/* Image gallery */}
+        <Grid item xs={12} md={7}>
           {images.length > 0 ? (
-
             <>
-
-              {/* Main Image */}
-
               <Box
                 component="img"
                 src={currentImage}
@@ -498,13 +268,9 @@ export default function ListingDetail() {
                   objectFit: 'cover',
                   borderRadius: 3,
                   display: 'block',
-                  backgroundColor:
-                    '#f5f5f5',
+                  backgroundColor: '#f5f5f5',
                 }}
               />
-
-
-              {/* Counter */}
 
               <Typography
                 variant="body2"
@@ -514,13 +280,8 @@ export default function ListingDetail() {
                   textAlign: 'right',
                 }}
               >
-                {selectedImage + 1}{' '}
-                /{' '}
-                {images.length}
+                {safeSelectedImage + 1} / {images.length}
               </Typography>
-
-
-              {/* Thumbnails */}
 
               <Box
                 sx={{
@@ -531,98 +292,56 @@ export default function ListingDetail() {
                   pb: 1,
                 }}
               >
-
-                {images.map(
-                  (image, index) => (
-
-                    <Box
-                      key={`${image}-${index}`}
-                      component="img"
-                      src={image}
-                      alt={`${listing.title} ${
-                        index + 1
-                      }`}
-                      onClick={() =>
-                        setSelectedImage(
-                          index
-                        )
-                      }
-                      sx={{
-                        width: 80,
-                        height: 65,
-                        objectFit: 'cover',
-                        borderRadius: 2,
-                        cursor: 'pointer',
-                        flexShrink: 0,
-
-                        border:
-                          selectedImage === index
-                            ? '3px solid'
-                            : '1px solid',
-
-                        borderColor:
-                          selectedImage === index
-                            ? 'primary.main'
-                            : 'divider',
-
-                        opacity:
-                          selectedImage === index
-                            ? 1
-                            : 0.75,
-                      }}
-                    />
-
-                  )
-                )}
-
+                {images.map((image, index) => (
+                  <Box
+                    key={`${image}-${index}`}
+                    component="img"
+                    src={image}
+                    alt={`${listing.title} ${index + 1}`}
+                    onClick={() => setSelectedImage(index)}
+                    sx={{
+                      width: 80,
+                      height: 65,
+                      objectFit: 'cover',
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      border:
+                        safeSelectedImage === index
+                          ? '3px solid'
+                          : '1px solid',
+                      borderColor:
+                        safeSelectedImage === index
+                          ? 'primary.main'
+                          : 'divider',
+                      opacity: safeSelectedImage === index ? 1 : 0.75,
+                    }}
+                  />
+                ))}
               </Box>
-
             </>
-
           ) : (
-
             <Box
               sx={{
                 height: 380,
                 borderRadius: 3,
-                backgroundColor:
-                  '#f5f5f5',
+                backgroundColor: '#f5f5f5',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-
-              <Typography
-                color="text.secondary"
-              >
+              <Typography color="text.secondary">
                 No image available
               </Typography>
-
             </Box>
-
           )}
-
         </Grid>
 
-
-        {/* ========================= */}
-        {/* LISTING INFORMATION */}
-        {/* ========================= */}
-
-        <Grid
-          item
-          xs={12}
-          md={5}
-        >
-
-          {/* Category */}
-
+        {/* Listing information */}
+        <Grid item xs={12} md={5}>
           <Chip
-            label={
-              listing.category ||
-              'Other'
-            }
+            label={listing.category || 'Other'}
             size="small"
             sx={{
               bgcolor: '#F2EFE6',
@@ -630,35 +349,21 @@ export default function ListingDetail() {
             }}
           />
 
-
-          {/* Title */}
-
           <Typography variant="h4">
             {listing.title}
           </Typography>
 
-
-          {/* Price */}
-
           <Typography
             variant="h4"
             sx={{
-              color:
-                'primary.dark',
+              color: 'primary.dark',
               fontWeight: 700,
               mt: 1,
             }}
           >
             ₹
-            {Number(
-              listing.price || 0
-            ).toLocaleString(
-              'en-IN'
-            )}
+            {Number(listing.price || 0).toLocaleString('en-IN')}
           </Typography>
-
-
-          {/* Location */}
 
           <Box
             sx={{
@@ -666,63 +371,35 @@ export default function ListingDetail() {
               alignItems: 'center',
               gap: 0.5,
               mt: 1.5,
-              color:
-                'text.secondary',
+              color: 'text.secondary',
             }}
           >
-
-            <RoomOutlinedIcon
-              fontSize="small"
-            />
-
+            <RoomOutlinedIcon fontSize="small" />
 
             <Typography variant="body2">
-              {listing.neighborhood ||
-                'Nearby'}
+              {listing.neighborhood || 'Nearby'}
             </Typography>
 
-
-            <Typography
-              sx={{ mx: 1 }}
-            >
-              ·
-            </Typography>
-
+            <Typography sx={{ mx: 1 }}>·</Typography>
 
             <Typography variant="body2">
-              {listing.condition ||
-                'Good'}
+              {listing.condition || 'Good'}
             </Typography>
-
           </Box>
 
-
-          {/* Distance */}
-
-          {typeof listing.distance ===
-            'number' && (
-
+          {typeof listing.distance === 'number' && (
             <Typography
               variant="body2"
               color="text.secondary"
               sx={{ mt: 0.5 }}
             >
-
               {listing.distance === 0
                 ? 'At your location'
                 : `${listing.distance} km away`}
-
             </Typography>
-
           )}
 
-
-          <Divider
-            sx={{ my: 3 }}
-          />
-
-
-          {/* Description */}
+          <Divider sx={{ my: 3 }} />
 
           <Typography
             variant="subtitle2"
@@ -732,25 +409,13 @@ export default function ListingDetail() {
             Description
           </Typography>
 
-
-          <Typography
-            variant="body2"
-            sx={{ mb: 3 }}
-          >
-            {listing.description ||
-              'No description provided.'}
+          <Typography variant="body2" sx={{ mb: 3 }}>
+            {listing.description || 'No description provided.'}
           </Typography>
 
+          <Divider sx={{ my: 3 }} />
 
-          <Divider
-            sx={{ my: 3 }}
-          />
-
-
-          {/* ========================= */}
-          {/* SELLER */}
-          {/* ========================= */}
-
+          {/* Seller */}
           <Typography
             variant="subtitle2"
             color="text.secondary"
@@ -758,7 +423,6 @@ export default function ListingDetail() {
           >
             Seller
           </Typography>
-
 
           <Box
             sx={{
@@ -768,143 +432,72 @@ export default function ListingDetail() {
               mb: 3,
             }}
           >
-
-            <Avatar
-              sx={{
-                bgcolor:
-                  'primary.main',
-              }}
-            >
+            <Avatar sx={{ bgcolor: 'primary.main' }}>
               {sellerInitial}
             </Avatar>
 
-
             <Box>
-
-              <Typography
-                fontWeight={600}
-              >
+              <Typography fontWeight={600}>
                 {sellerName}
               </Typography>
 
-
               {sellerEmail && (
-
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                >
+                <Typography variant="caption" color="text.secondary">
                   {sellerEmail}
                 </Typography>
-
               )}
-
             </Box>
-
           </Box>
 
-
-          {/* ========================= */}
-          {/* OWNER ACTIONS */}
-          {/* ========================= */}
-
+          {/* Owner or buyer actions */}
           {isOwner ? (
-
-            <Box
-              sx={{
-                display: 'flex',
-                gap: 1.5,
-              }}
-            >
-
-              {/* Edit */}
-
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
               <Button
                 variant="outlined"
-                startIcon={
-                  <EditOutlinedIcon />
-                }
+                startIcon={<EditOutlinedIcon />}
                 fullWidth
-                onClick={() =>
-                  navigate(
-                    `/edit-listing/${listing._id}`
-                  )
-                }
+                onClick={() => navigate(`/edit-listing/${listing._id}`)}
               >
                 Edit listing
               </Button>
 
-
-              {/* Delete */}
-
               <Button
                 variant="outlined"
                 color="error"
-                startIcon={
-                  <DeleteIcon />
-                }
+                startIcon={<DeleteIcon />}
                 fullWidth
                 disabled={deleting}
-                onClick={
-                  handleDelete
-                }
+                onClick={handleDelete}
               >
-                {deleting
-                  ? 'Deleting...'
-                  : 'Delete'}
+                {deleting ? 'Deleting...' : 'Delete'}
               </Button>
-
             </Box>
-
           ) : (
-
-            /* ========================= */
-            /* BUYER ACTIONS */
-            /* ========================= */
-
-            <Box
-              sx={{
-                display: 'flex',
-                gap: 1.5,
-              }}
-            >
-
-              {/* Message Seller */}
-
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
               <Button
                 variant="outlined"
-                startIcon={
-                  <ChatBubbleOutlineIcon />
-                }
+                startIcon={<ChatBubbleOutlineIcon />}
                 fullWidth
-                onClick={
-                  handleMessageSeller
-                }
+                onClick={handleMessageSeller}
               >
                 Message seller
               </Button>
 
-
-              {/* Buy Now */}
-
               <Button
                 variant="contained"
                 fullWidth
-                onClick={() =>
-                  navigate(
-                    `/checkout/${listing._id}`
-                  )
-                }
+                onClick={() => navigate(`/checkout/${listing._id}`)}
               >
                 Buy now
               </Button>
-
             </Box>
-
           )}
 
-
-          {/* Payment information */}
+          {error && (
+            <Typography color="error" variant="body2" sx={{ mt: 2 }}>
+              {error}
+            </Typography>
+          )}
 
           <Paper
             variant="outlined"
@@ -912,29 +505,17 @@ export default function ListingDetail() {
               mt: 3,
               p: 2,
               borderRadius: 2,
-              borderColor:
-                'divider',
-              bgcolor:
-                '#F2EFE6',
+              borderColor: 'divider',
+              bgcolor: '#F2EFE6',
             }}
           >
-
-            <Typography
-              variant="body2"
-            >
-              Payment is held safely until
-              you confirm the item was
-              delivered as described.
+            <Typography variant="body2">
+              Payment is held safely until you confirm the item was delivered
+              as described.
             </Typography>
-
           </Paper>
-
         </Grid>
-
       </Grid>
-
     </Box>
-
   );
-
 }
