@@ -1,3 +1,4 @@
+
 import { Routes, Route } from 'react-router-dom';
 
 import AppShell from './layouts/AppShell';
@@ -13,6 +14,7 @@ import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
 import Profile from './pages/Profile';
 import Notifications from './pages/Notifications';
+import Grocery from './pages/Grocery';
 
 export default function App() {
   return (
@@ -23,9 +25,11 @@ export default function App() {
 
       {/* Main Application */}
       <Route element={<AppShell />}>
-
-        {/* Home */}
+        {/* Existing marketplace homepage */}
         <Route path="/" element={<Home />} />
+
+        {/* Grocery */}
+        <Route path="/grocery" element={<Grocery />} />
 
         {/* Listing Details */}
         <Route
@@ -66,7 +70,6 @@ export default function App() {
           path="/notifications"
           element={<Notifications />}
         />
-
       </Route>
     </Routes>
   );

@@ -1,10 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import {
-  Outlet,
-  useNavigate,
-  useLocation,
-} from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
 import {
   Box,
@@ -21,16 +17,15 @@ import {
   Avatar,
   Chip,
   IconButton,
+  Button,
 } from '@mui/material';
 
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlineOutlined';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
-import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
-import PersonOutlineIcon from '@mui/icons-material/PersonOutlineOutlined';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLong';
 import SearchIcon from '@mui/icons-material/Search';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import RoomOutlinedIcon from '@mui/icons-material/RoomOutlined';
+import ShoppingBasketOutlinedIcon from '@mui/icons-material/ShoppingBasketOutlined';
 
 const DRAWER_WIDTH = 232;
 
@@ -43,15 +38,31 @@ const API_BASE =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 const navItems = [
-  { label: 'Nearby', icon: <StorefrontOutlinedIcon />, path: '/' },
+  {
+    label: 'Nearby',
+    icon: <StorefrontOutlinedIcon />,
+    path: '/',
+  },
   {
     label: 'Sell something',
-    icon: <AddCircleOutlineIcon />,
+    icon: <span style={{ fontSize: 22, lineHeight: 1 }}>＋</span>,
     path: '/create-listing',
   },
-  { label: 'Messages', icon: <ChatBubbleOutlineIcon />, path: '/chat' },
-  { label: 'Orders', icon: <ReceiptLongOutlinedIcon />, path: '/orders' },
-  { label: 'Profile', icon: <PersonOutlineIcon />, path: '/profile' },
+  {
+    label: 'Messages',
+    icon: <span style={{ fontSize: 20, lineHeight: 1 }}>💬</span>,
+    path: '/chat',
+  },
+  {
+    label: 'Orders',
+    icon: <ReceiptLongOutlinedIcon />,
+    path: '/orders',
+  },
+  {
+    label: 'Profile',
+    icon: <span style={{ fontSize: 20, lineHeight: 1 }}>👤</span>,
+    path: '/profile',
+  },
 ];
 
 function getLoggedInUser() {
@@ -84,7 +95,7 @@ function getLoggedInUser() {
       tokenUser = payload.user || payload;
     }
   } catch {
-    // Account details may still be available in saved user data.
+    // Saved user data can still be used.
   }
 
   return {
@@ -114,6 +125,7 @@ export default function AppShell() {
     setUser(getLoggedInUser());
   }, [location.pathname]);
 
+  // Refresh unread notifications.
   useEffect(() => {
     let active = true;
 
@@ -149,31 +161,37 @@ export default function AppShell() {
 
     fetchUnreadCount();
 
-    // Refresh periodically so new notifications appear in the badge.
     const intervalId = window.setInterval(fetchUnreadCount, 30000);
 
-    // Refresh immediately when returning to this tab.
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         fetchUnreadCount();
       }
     };
 
-    // Allow other components to request an immediate refresh.
     const handleNotificationsUpdated = () => {
       fetchUnreadCount();
     };
 
-    window.addEventListener('notificationsUpdated', handleNotificationsUpdated);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener(
+      'notificationsUpdated',
+      handleNotificationsUpdated
+    );
+
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibilityChange
+    );
 
     return () => {
       active = false;
       window.clearInterval(intervalId);
+
       window.removeEventListener(
         'notificationsUpdated',
         handleNotificationsUpdated
       );
+
       document.removeEventListener(
         'visibilitychange',
         handleVisibilityChange
@@ -181,6 +199,7 @@ export default function AppShell() {
     };
   }, [location.pathname]);
 
+  // Refresh user information after account changes.
   useEffect(() => {
     const refreshUser = () => setUser(getLoggedInUser());
 
@@ -194,6 +213,7 @@ export default function AppShell() {
   }, []);
 
   const displayName = user.name || 'My Account';
+
   const initials = displayName
     .split(' ')
     .filter(Boolean)
@@ -203,7 +223,14 @@ export default function AppShell() {
     .toUpperCase();
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: PAGE_BG }}>
+    <Box
+      sx={{
+        display: 'flex',
+        minHeight: '100vh',
+        bgcolor: PAGE_BG,
+      }}
+    >
+      {/* Sidebar */}
       <Drawer
         variant="permanent"
         sx={{
@@ -222,12 +249,17 @@ export default function AppShell() {
         <Box sx={{ px: 3, py: 3 }}>
           <Typography
             variant="h5"
-            sx={{ color: BLUE, fontWeight: 800, letterSpacing: '-0.02em' }}
+            sx={{
+              color: BLUE,
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+            }}
           >
             Aas-Paas
           </Typography>
+
           <Typography variant="caption" sx={{ color: '#64748B' }}>
-            buy & sell nearby
+            buy &amp; sell nearby
           </Typography>
         </Box>
 
@@ -253,15 +285,22 @@ export default function AppShell() {
                   '&.Mui-selected': {
                     bgcolor: LIGHT_BLUE,
                     color: DARK_BLUE,
-                    '& .MuiListItemIcon-root': { color: DARK_BLUE },
-                    '&:hover': { bgcolor: '#BAE6FD' },
+                    '& .MuiListItemIcon-root': {
+                      color: DARK_BLUE,
+                    },
+                    '&:hover': {
+                      bgcolor: '#BAE6FD',
+                    },
                   },
-                  '&:hover': { bgcolor: '#F0F9FF' },
+                  '&:hover': {
+                    bgcolor: '#F0F9FF',
+                  },
                 }}
               >
                 <ListItemIcon sx={{ minWidth: 40 }}>
                   {item.icon}
                 </ListItemIcon>
+
                 <ListItemText
                   primary={item.label}
                   primaryTypographyProps={{
@@ -274,6 +313,7 @@ export default function AppShell() {
           })}
         </List>
 
+        {/* User profile */}
         <Box sx={{ mt: 'auto', p: 2 }}>
           <Box
             role="button"
@@ -291,7 +331,9 @@ export default function AppShell() {
               bgcolor: LIGHT_BLUE,
               cursor: 'pointer',
               minWidth: 0,
-              '&:hover': { bgcolor: '#BAE6FD' },
+              '&:hover': {
+                bgcolor: '#BAE6FD',
+              },
             }}
           >
             <Avatar
@@ -307,6 +349,7 @@ export default function AppShell() {
             >
               {!user.avatar && initials}
             </Avatar>
+
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
                 variant="body2"
@@ -316,10 +359,14 @@ export default function AppShell() {
               >
                 {displayName}
               </Typography>
+
               <Typography
                 variant="caption"
                 noWrap
-                sx={{ color: '#0369A1', display: 'block' }}
+                sx={{
+                  color: '#0369A1',
+                  display: 'block',
+                }}
               >
                 {user.neighborhood || user.email || 'My Profile'}
               </Typography>
@@ -328,6 +375,7 @@ export default function AppShell() {
         </Box>
       </Drawer>
 
+      {/* Main content */}
       <Box
         sx={{
           flexGrow: 1,
@@ -353,10 +401,13 @@ export default function AppShell() {
               sx={{
                 borderColor: '#BAE6FD',
                 color: DARK_BLUE,
-                '& .MuiChip-icon': { color: BLUE },
+                '& .MuiChip-icon': {
+                  color: BLUE,
+                },
               }}
             />
 
+            {/* Marketplace search */}
             <Box
               sx={{
                 flexGrow: 1,
@@ -368,10 +419,16 @@ export default function AppShell() {
                 px: 1.5,
                 py: 0.5,
                 maxWidth: 420,
-                '&:focus-within': { borderColor: BLUE },
+                '&:focus-within': {
+                  borderColor: BLUE,
+                },
               }}
             >
-              <SearchIcon sx={{ color: BLUE, mr: 1 }} fontSize="small" />
+              <SearchIcon
+                sx={{ color: BLUE, mr: 1 }}
+                fontSize="small"
+              />
+
               <InputBase
                 placeholder="Search nearby listings"
                 value={search}
@@ -383,10 +440,37 @@ export default function AppShell() {
 
             <Box sx={{ flexGrow: 1 }} />
 
+            {/* Grocery */}
+            <Button
+              variant="outlined"
+              startIcon={<ShoppingBasketOutlinedIcon />}
+              onClick={() => navigate('/grocery')}
+              sx={{
+                color: DARK_BLUE,
+                borderColor: '#BAE6FD',
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                '&:hover': {
+                  bgcolor: LIGHT_BLUE,
+                  borderColor: BLUE,
+                },
+              }}
+            >
+              Grocery
+            </Button>
+
+            {/* Notifications */}
             <IconButton
               aria-label={`Notifications, ${unreadCount} unread`}
               onClick={() => navigate('/notifications')}
-              sx={{ color: BLUE, '&:hover': { bgcolor: LIGHT_BLUE } }}
+              sx={{
+                color: BLUE,
+                '&:hover': {
+                  bgcolor: LIGHT_BLUE,
+                },
+              }}
             >
               <Badge
                 badgeContent={unreadCount}
