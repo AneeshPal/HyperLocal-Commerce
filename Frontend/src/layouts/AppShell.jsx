@@ -27,15 +27,14 @@ import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import RoomOutlinedIcon from '@mui/icons-material/RoomOutlined';
 import ShoppingBasketOutlinedIcon from '@mui/icons-material/ShoppingBasketOutlined';
 
+import { API_URL } from '../config';
+
 const DRAWER_WIDTH = 232;
 
 const BLUE = '#0284C7';
 const DARK_BLUE = '#0369A1';
 const LIGHT_BLUE = '#E0F2FE';
 const PAGE_BG = '#F8FAFC';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 const navItems = [
   {
@@ -139,7 +138,7 @@ export default function AppShell() {
 
       try {
         const response = await fetch(
-          `${API_BASE}/api/notifications/unread-count`,
+          `${API_URL}/notifications/unread-count`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
