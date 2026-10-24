@@ -12,7 +12,6 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  Stack,
   Tab,
   Tabs,
   Typography,
@@ -49,7 +48,7 @@ function ProductCard({ product }) {
         <Box
           component="img"
           src={product.image}
-          alt={product.title}
+          alt={product.title || 'Product'}
           loading="lazy"
           sx={{
             width: '100%',
@@ -81,13 +80,13 @@ function ProductCard({ product }) {
         }}
       >
         <Chip
-          label={product.source}
+          label={product.source || 'Marketplace'}
           size="small"
           sx={{ alignSelf: 'flex-start' }}
         />
 
         <Typography fontWeight={650} sx={{ lineHeight: 1.35 }}>
-          {product.title}
+          {product.title || 'Untitled product'}
         </Typography>
 
         {product.brand && (
@@ -105,7 +104,8 @@ function ProductCard({ product }) {
         </Typography>
 
         <Typography variant="caption" color="text.secondary">
-          Match relevance: {Math.round((product.matchScore || 0) * 100)}%
+          Match relevance:{' '}
+          {Math.round((product.matchScore || 0) * 100)}%
         </Typography>
 
         <Box sx={{ flexGrow: 1 }} />
@@ -131,6 +131,8 @@ export default function MarketComparisonDialog({
   open,
   onClose,
   listing,
+  query: queryProp,
+  category: categoryProp,
 }) {
   const [tab, setTab] = useState(0);
   const [data, setData] = useState(null);
@@ -138,12 +140,21 @@ export default function MarketComparisonDialog({
   const [error, setError] = useState('');
 
   const query = useMemo(
-    () => listing?.title?.trim() || '',
-    [listing?.title]
+    () => (queryProp ?? listing?.title ?? '').trim(),
+    [queryProp, listing?.title]
   );
 
+  const category = categoryProp ?? listing?.category ?? '';
+
   useEffect(() => {
-    if (!open || !query) return undefined;
+    if (!open) return undefined;
+
+    if (!query) {
+      setData(null);
+      setError('The listing does not have a product title to search.');
+      setLoading(false);
+      return undefined;
+    }
 
     const controller = new AbortController();
 
@@ -155,11 +166,11 @@ export default function MarketComparisonDialog({
       try {
         const params = new URLSearchParams({
           query,
-          category: listing?.category || '',
+          category,
         });
 
         const response = await fetch(
-          `${API_URL}/market-comparison?${params}`,
+          `${API_URL}/market-comparison?${params.toString()}`,
           { signal: controller.signal }
         );
 
@@ -188,10 +199,15 @@ export default function MarketComparisonDialog({
     loadProducts();
 
     return () => controller.abort();
-  }, [open, query, listing?.category]);
+  }, [open, query, category]);
 
-  const exactMatches = data?.exactMatches || [];
-  const similarProducts = data?.similarProducts || [];
+  const exactMatches = Array.isArray(data?.exactMatches)
+    ? data.exactMatches
+    : [];
+
+  const similarProducts = Array.isArray(data?.similarProducts)
+    ? data.similarProducts
+    : [];
 
   const products =
     tab === 0
@@ -348,12 +364,18 @@ export default function MarketComparisonDialog({
               </Box>
             )}
 
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mt: 2, flexWrap: 'wrap' }}
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 1,
+                mt: 2,
+                flexWrap: 'wrap',
+              }}
             >
-              {(data.providersAvailable || []).map((provider) => (
+              {(Array.isArray(data.providersAvailable)
+                ? data.providersAvailable
+                : []
+              ).map((provider) => (
                 <Chip
                   key={provider}
                   label={`Source: ${provider}`}
@@ -361,7 +383,7 @@ export default function MarketComparisonDialog({
                   variant="outlined"
                 />
               ))}
-            </Stack>
+            </Box>
           </>
         )}
       </DialogContent>

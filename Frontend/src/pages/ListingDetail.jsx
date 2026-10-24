@@ -1,10 +1,6 @@
 
 import { useEffect, useState } from 'react';
-
-import {
-  useParams,
-  useNavigate,
-} from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 
 import {
   Box,
@@ -22,8 +18,10 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlineOutlined
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import TravelExploreOutlinedIcon from '@mui/icons-material/TravelExploreOutlined';
 
 import { API_URL } from '../config';
+import MarketComparisonDialog from '../components/MarketComparisonDialog';
 
 export default function ListingDetail() {
   const { id } = useParams();
@@ -34,6 +32,7 @@ export default function ListingDetail() {
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [marketDialogOpen, setMarketDialogOpen] = useState(false);
 
   // Fetch listing.
   useEffect(() => {
@@ -84,7 +83,6 @@ export default function ListingDetail() {
     };
   }, [id]);
 
-  // Loading.
   if (loading) {
     return (
       <Box sx={{ py: 8, textAlign: 'center' }}>
@@ -93,7 +91,6 @@ export default function ListingDetail() {
     );
   }
 
-  // Error.
   if (error || !listing) {
     return (
       <Box sx={{ py: 8, textAlign: 'center' }}>
@@ -108,7 +105,6 @@ export default function ListingDetail() {
     );
   }
 
-  // Token and owner.
   const token = localStorage.getItem('token');
 
   let currentUserId = null;
@@ -122,7 +118,6 @@ export default function ListingDetail() {
     }
   }
 
-  // Images.
   const images = Array.isArray(listing.images) ? listing.images : [];
 
   const safeSelectedImage =
@@ -133,7 +128,6 @@ export default function ListingDetail() {
   const currentImage =
     images.length > 0 ? images[safeSelectedImage] : null;
 
-  // Seller.
   const seller =
     listing.seller && typeof listing.seller === 'object'
       ? listing.seller
@@ -150,7 +144,6 @@ export default function ListingDetail() {
     sellerId &&
     String(currentUserId) === String(sellerId);
 
-  // Delete listing.
   const handleDelete = async () => {
     const confirmed = window.confirm(
       'Are you sure you want to delete this listing?'
@@ -192,7 +185,6 @@ export default function ListingDetail() {
     }
   };
 
-  // Message seller.
   const handleMessageSeller = async () => {
     const currentToken = localStorage.getItem('token');
 
@@ -245,10 +237,7 @@ export default function ListingDetail() {
       <Button
         startIcon={<ArrowBackIcon />}
         onClick={() => navigate(-1)}
-        sx={{
-          mb: 2,
-          color: 'text.secondary',
-        }}
+        sx={{ mb: 2, color: 'text.secondary' }}
       >
         Back
       </Button>
@@ -275,10 +264,7 @@ export default function ListingDetail() {
               <Typography
                 variant="body2"
                 color="text.secondary"
-                sx={{
-                  mt: 1,
-                  textAlign: 'right',
-                }}
+                sx={{ mt: 1, textAlign: 'right' }}
               >
                 {safeSelectedImage + 1} / {images.length}
               </Typography>
@@ -343,10 +329,7 @@ export default function ListingDetail() {
           <Chip
             label={listing.category || 'Other'}
             size="small"
-            sx={{
-              bgcolor: '#F2EFE6',
-              mb: 1.5,
-            }}
+            sx={{ bgcolor: '#F2EFE6', mb: 1.5 }}
           />
 
           <Typography variant="h4">
@@ -361,9 +344,19 @@ export default function ListingDetail() {
               mt: 1,
             }}
           >
-            ₹
-            {Number(listing.price || 0).toLocaleString('en-IN')}
+            ₹{Number(listing.price || 0).toLocaleString('en-IN')}
           </Typography>
+
+          {/* NEW: Browse market button */}
+          <Button
+            variant="outlined"
+            fullWidth
+            startIcon={<TravelExploreOutlinedIcon />}
+            onClick={() => setMarketDialogOpen(true)}
+            sx={{ mt: 2, py: 1.2, borderRadius: 2 }}
+          >
+            Browse Market for This Product
+          </Button>
 
           <Box
             sx={{
@@ -516,6 +509,14 @@ export default function ListingDetail() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* NEW: Market comparison popup */}
+      <MarketComparisonDialog
+        open={marketDialogOpen}
+        onClose={() => setMarketDialogOpen(false)}
+        query={listing.title}
+        category={listing.category || ''}
+      />
     </Box>
   );
 }
