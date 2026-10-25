@@ -20,6 +20,7 @@ import paymentRoutes from "./routes/payment.js";
 import paymentWebhookRoutes from "./routes/paymentWebhook.js";
 import notificationRoutes from "./routes/notifications.js";
 import marketComparisonRoutes from "./routes/marketComparison.js";
+import productReviewsRoutes from "./routes/productReviews.js";
 
 import authMiddleware from "./middleware/auth.js";
 
@@ -47,6 +48,8 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/market-comparison", marketComparisonRoutes);
+app.use("/api/product-reviews", productReviewsRoutes);
+
 
 // Protected test route
 app.get("/api/protected", authMiddleware, (req, res) => {
